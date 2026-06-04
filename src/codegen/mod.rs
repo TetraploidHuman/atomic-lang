@@ -1216,8 +1216,9 @@ impl<'ctx> CodeGen<'ctx> {
         let triple_str = self.target_triple.as_deref().unwrap_or("native");
         let (target, cpu, features, target_triple) = match triple_str {
             "native" | "" => {
-                Target::initialize_native(&InitializationConfig::default())
-                    .map_err(|e| format!("Failed to initialize native target: {}", e))?;
+                // Only initialize X86 to avoid pulling in all-target symbols
+                // that may not be linked in static Windows builds.
+                Target::initialize_x86(&InitializationConfig::default());
                 let tt = TargetMachine::get_default_triple();
                 let t =
                     Target::from_triple(&tt).map_err(|e| format!("Failed to get target: {}", e))?;
@@ -1254,9 +1255,8 @@ impl<'ctx> CodeGen<'ctx> {
                 (t, "generic".to_string(), "".to_string(), tt)
             }
             other => {
-                // Try as a raw LLVM triple: initialize all common targets
-                Target::initialize_native(&InitializationConfig::default())
-                    .map_err(|e| format!("Failed to initialize native target: {}", e))?;
+                // Try as a raw LLVM triple: initialize common targets individually
+                // (avoid initialize_native which can pull in all-target symbols)
                 Target::initialize_x86(&InitializationConfig::default());
                 Target::initialize_aarch64(&InitializationConfig::default());
                 Target::initialize_webassembly(&InitializationConfig::default());
