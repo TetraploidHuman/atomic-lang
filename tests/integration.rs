@@ -1,8 +1,43 @@
+use std::path::PathBuf;
 use std::process::Command;
 
+fn atomic_binary() -> PathBuf {
+    let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target");
+
+    let candidates = [
+        // Specific target dirs (when built with --target)
+        base.join("x86_64-unknown-linux-gnu/debug/atomic"),
+        base.join("aarch64-unknown-linux-gnu/debug/atomic"),
+        // Default (no --target)
+        base.join("debug/atomic"),
+    ];
+
+    for p in &candidates {
+        if p.exists() {
+            return p.clone();
+        }
+    }
+    panic!("atomic binary not found — build with `cargo build` first");
+}
+
 fn run_example(name: &str) -> String {
-    let output = Command::new("target/debug/atomic")
-        .args(["run", &format!("examples/{}", name)])
+    let example = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("examples")
+        .join(name);
+    let output = Command::new(atomic_binary())
+        .args(["run", example.to_str().unwrap()])
+        .output()
+        .expect(&format!("Failed to run example: {}", name));
+    String::from_utf8_lossy(&output.stdout).to_string()
+}
+
+fn run_example(name: &str) -> String {
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
+    let example = std::path::Path::new(manifest_dir)
+        .join("examples")
+        .join(name);
+    let output = Command::new(atomic_binary())
+        .args(["run", example.to_str().unwrap()])
         .output()
         .expect(&format!("Failed to run example: {}", name));
     String::from_utf8_lossy(&output.stdout).to_string()
