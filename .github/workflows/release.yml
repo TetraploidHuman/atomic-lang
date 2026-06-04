@@ -3,9 +3,138 @@ name: Release
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 0.1.0)'
+        required: false
+        default: ''
 
 jobs:
-  test:
-    runs-on: ubuntu-24.04
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x64-static
+            os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            link_type: static
+            llvm_archive: LLVM-21.1.8-Linux-X64.tar.xz
+
+          - name: linux-x64-dynamic
+            os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            link_type: dynamic
+            llvm_archive: LLVM-21.1.8-Linux-X64.tar.xz
+
     steps:
-      - run: echo "hello from release workflow"
+      - uses: actions/checkout@v4
+
+      - name: Set version
+        id: ver
+        shell: bash
+        run: |
+          INPUT="${{ github.event.inputs.version }}"
+          if [ -n "$INPUT" ]; then
+            echo "value=$INPUT" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.ref_type }}" = "tag" ]; then
+            TAG="${{ github.ref_name }}"
+            echo "value=${TAG#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=dev" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libffi-dev zlib1g-dev patchelf
+
+      - name: Setup LLVM
+        run: |
+          URL="https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.8/${{ matrix.llvm_archive }}"
+          echo "Downloading $URL"
+          mkdir -p /tmp/llvm
+          curl -fSL --retry 3 --connect-timeout 30 "$URL" -o /tmp/llvm.tar.xz
+          tar xf /tmp/llvm.tar.xz -C /tmp/llvm --strip-components=1
+          rm -f /tmp/llvm.tar.xz
+          echo "LLVM_SYS_211_PREFIX=/tmp/llvm" >> "$GITHUB_ENV"
+
+      - name: Force static linking
+        if: matrix.link_type == 'static'
+        run: |
+          find /tmp/llvm/lib -maxdepth 1 -name 'libLLVM.so*' -delete 2>/dev/null || true
+
+      - name: Build (dynamic)
+        if: matrix.link_type == 'dynamic'
+        run: |
+          export RUSTFLAGS='-C link-args=-Wl,-rpath,$ORIGIN/../lib'
+          cargo build --release --target ${{ matrix.target }}
+
+      - name: Build (static)
+        if: matrix.link_type == 'static'
+        run: |
+          cargo build --release --target ${{ matrix.target }}
+
+      - name: Package
+        id: pkg
+        shell: bash
+        run: |
+          set -euo pipefail
+          VER="${{ steps.ver.outputs.value }}"
+          ARCH="${{ contains(matrix.target, 'aarch64') && 'arm64' || 'x64' }}"
+          PKG="atomic-${VER}-linux-${ARCH}-${{ matrix.link_type }}"
+          DIR="/tmp/${PKG}"
+
+          mkdir -p "${DIR}/bin" "${DIR}/lib"
+
+          cp "target/${{ matrix.target }}/release/atomic" "${DIR}/bin/"
+          strip "${DIR}/bin/atomic" 2>/dev/null || true
+
+          if [ "${{ matrix.link_type }}" = "dynamic" ]; then
+            LLVM_SO=$(find /tmp/llvm/lib -maxdepth 1 -name 'libLLVM.so.*' ! -name '*.gz' 2>/dev/null | head -1)
+            cp "$LLVM_SO" "${DIR}/lib/"
+            patchelf --set-rpath '$ORIGIN/../lib' "${DIR}/bin/atomic"
+          fi
+
+          cd /tmp
+          tar czf "${PKG}.tar.gz" "${PKG}"
+          echo "file=${PKG}.tar.gz" >> "$GITHUB_OUTPUT"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: /tmp/${{ steps.pkg.outputs.file }}
+          if-no-files-found: error
+
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-24.04
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/artifacts
+
+      - name: Flatten
+        run: |
+          mkdir -p /tmp/release-assets
+          find /tmp/artifacts -type f -name '*.tar.gz' -exec cp {} /tmp/release-assets/ \;
+          ls -lh /tmp/release-assets/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Atomic v${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          files: /tmp/release-assets/*
+          generate_release_notes: true
