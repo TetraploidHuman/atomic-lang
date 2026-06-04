@@ -163,34 +163,38 @@ jobs:
         id: pkg-linux
         shell: bash
         run: |
-          set -euo pipefail
+          set -x
           VER="${{ steps.ver.outputs.value }}"
           ARCH="${{ contains(matrix.target, 'aarch64') && 'arm64' || 'x64' }}"
-          if [ "${{ matrix.link_type }}" = "default" ]; then
+          LT="${{ matrix.link_type }}"
+          if [ "$LT" = "default" ]; then
             SUFFIX=""
           else
-            SUFFIX="-${{ matrix.link_type }}"
+            SUFFIX="-$LT"
           fi
           PKG="atomic-${VER}-linux-${ARCH}${SUFFIX}"
           DIR="/tmp/${PKG}"
+          echo "PKG=$PKG DIR=$DIR LT=$LT"
 
           mkdir -p "${DIR}/bin" "${DIR}/lib" "${DIR}/examples"
 
-          cp "target/${{ matrix.target }}/release/atomic" "${DIR}/bin/"
-          cp README.md "${DIR}/"
+          cp -v "target/${{ matrix.target }}/release/atomic" "${DIR}/bin/"
+          cp -v README.md "${DIR}/"
           cp -r examples/* "${DIR}/examples/" 2>/dev/null || true
 
           strip "${DIR}/bin/atomic" 2>/dev/null || true
 
-          if [ "${{ matrix.link_type }}" = "default" ]; then
+          if [ "$LT" = "default" ]; then
+            echo "Looking for LLVM shared library..."
+            ls -la /tmp/llvm/lib/libLLVM* 2>/dev/null || echo "(no libLLVM* found)"
             LLVM_SO=$(find /tmp/llvm/lib -maxdepth 1 -name 'libLLVM.so.*' ! -name '*.gz' 2>/dev/null | head -1)
+            echo "LLVM_SO=$LLVM_SO"
             if [ -z "$LLVM_SO" ]; then
               echo "::error::Could not find libLLVM.so in /tmp/llvm/lib"
-              ls -la /tmp/llvm/lib/libLLVM* 2>/dev/null || echo "(no libLLVM* found)"
               exit 1
             fi
-            cp "$LLVM_SO" "${DIR}/lib/"
-            patchelf --set-rpath '$ORIGIN/../lib' "${DIR}/bin/atomic"
+            cp -v "$LLVM_SO" "${DIR}/lib/"
+            patchelf --set-rpath '$ORIGIN/../lib' "${DIR}/bin/atomic" && echo "patchelf OK" || echo "patchelf FAILED"
           fi
 
           cd /tmp
