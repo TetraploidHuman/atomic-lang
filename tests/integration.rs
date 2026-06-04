@@ -31,18 +31,6 @@ fn run_example(name: &str) -> String {
     String::from_utf8_lossy(&output.stdout).to_string()
 }
 
-fn run_example(name: &str) -> String {
-    let manifest_dir = env!("CARGO_MANIFEST_DIR");
-    let example = std::path::Path::new(manifest_dir)
-        .join("examples")
-        .join(name);
-    let output = Command::new(atomic_binary())
-        .args(["run", example.to_str().unwrap()])
-        .output()
-        .expect(&format!("Failed to run example: {}", name));
-    String::from_utf8_lossy(&output.stdout).to_string()
-}
-
 #[test]
 fn test_hello() {
     assert_eq!(run_example("hello.at"), "Hello, World!\n");
