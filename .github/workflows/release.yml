@@ -56,25 +56,6 @@ jobs:
             link_type: dynamic
             llvm_archive: LLVM-21.1.8-Linux-ARM64.tar.xz
 
-          # Windows x64
-          - name: windows-x64
-            os: windows-2022
-            target: x86_64-pc-windows-msvc
-            link_type: default
-            llvm_archive: LLVM-21.1.8-win64.exe
-
-          - name: windows-x64-static
-            os: windows-2022
-            target: x86_64-pc-windows-msvc
-            link_type: static
-            llvm_archive: LLVM-21.1.8-win64.exe
-
-          - name: windows-x64-dynamic
-            os: windows-2022
-            target: x86_64-pc-windows-msvc
-            link_type: dynamic
-            llvm_archive: LLVM-21.1.8-win64.exe
-
     steps:
       - uses: actions/checkout@v4
 
@@ -96,14 +77,12 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      - name: Install system deps (Linux)
-        if: runner.os == 'Linux'
+      - name: Install system deps
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq libffi-dev zlib1g-dev patchelf
 
-      - name: Setup LLVM (Linux)
-        if: runner.os == 'Linux'
+      - name: Setup LLVM
         run: |
           URL="https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.8/${{ matrix.llvm_archive }}"
           echo "Downloading $URL"
@@ -113,60 +92,38 @@ jobs:
           rm -f /tmp/llvm.tar.xz
           echo "LLVM_SYS_211_PREFIX=/tmp/llvm" >> "$GITHUB_ENV"
 
-      - name: Setup LLVM (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $URL = "https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.8/${{ matrix.llvm_archive }}"
-          Write-Host "Downloading $URL"
-          curl -fSL --retry 3 --connect-timeout 30 -o C:\llvm-installer.exe "$URL"
-          Write-Host "Installing LLVM silently to C:\llvm..."
-          Start-Process -Wait -FilePath "C:\llvm-installer.exe" -ArgumentList "/S", "/D=C:\llvm"
-          Remove-Item C:\llvm-installer.exe -Force
-          echo "LLVM_SYS_211_PREFIX=C:\llvm" >> $env:GITHUB_ENV
-
-      - name: Force static linking (Linux)
-        if: runner.os == 'Linux' && matrix.link_type == 'static'
+      - name: Force static linking
+        if: matrix.link_type == 'static'
         run: |
           find /tmp/llvm/lib -maxdepth 1 -name 'libLLVM.so*' -delete 2>/dev/null || true
 
-      - name: Force static linking (Windows)
-        if: runner.os == 'Windows' && matrix.link_type == 'static'
-        shell: pwsh
-        run: |
-          Remove-Item C:\llvm\bin\LLVM.dll -Force -ErrorAction SilentlyContinue
-          Remove-Item C:\llvm\lib\LLVM.lib -Force -ErrorAction SilentlyContinue
-
-      - name: Build (Linux non-static)
-        if: runner.os == 'Linux' && matrix.link_type != 'static'
+      - name: Build (non-static)
+        if: matrix.link_type != 'static'
         run: |
           export RUSTFLAGS='-C link-args=-Wl,-rpath,$ORIGIN/../lib'
           cargo build --release --target ${{ matrix.target }}
 
-      - name: Build (Linux static)
-        if: runner.os == 'Linux' && matrix.link_type == 'static'
+      - name: Build (static)
+        if: matrix.link_type == 'static'
         run: |
           cargo build --release --target ${{ matrix.target }}
 
-      - name: Build (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          cargo build --release --target ${{ matrix.target }}
-
-      - name: Smoke test (Linux)
-        if: runner.os == 'Linux'
+      - name: Smoke test
         run: cargo test --release 2>&1 | tail -5
 
-      - name: Package (Linux)
-        if: runner.os == 'Linux'
+      - name: Package
         id: pkg
         shell: bash
         run: |
           set -euo pipefail
           VER="${{ steps.ver.outputs.value }}"
           ARCH="${{ contains(matrix.target, 'aarch64') && 'arm64' || 'x64' }}"
-          SUFFIX="${{ matrix.link_type == 'default' && '' || format('-{0}', matrix.link_type) }}"
+          SUFFIX="${{ matrix.link_type == 'default' && '' || '-' }}"
+          if [ "${{ matrix.link_type }}" != "default" ]; then
+            SUFFIX="-${{ matrix.link_type }}"
+          else
+            SUFFIX=""
+          fi
           PKG="atomic-${VER}-linux-${ARCH}${SUFFIX}"
           DIR="/tmp/${PKG}"
 
@@ -193,53 +150,11 @@ jobs:
           tar czf "${PKG}.tar.gz" "${PKG}"
           echo "file=${PKG}.tar.gz" >> "$GITHUB_OUTPUT"
 
-      - name: Package (Windows)
-        if: runner.os == 'Windows'
-        id: pkg
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-          $VER = "${{ steps.ver.outputs.value }}"
-          $SUFFIX = "${{ matrix.link_type == 'default' && '' || '-' + matrix.link_type }}"
-          $PKG = "atomic-${VER}-windows-x64${SUFFIX}"
-          $DIR = "C:\${PKG}"
-
-          New-Item -ItemType Directory -Force -Path "$DIR\bin" | Out-Null
-          New-Item -ItemType Directory -Force -Path "$DIR\lib" | Out-Null
-          New-Item -ItemType Directory -Force -Path "$DIR\examples" | Out-Null
-
-          Copy-Item "target\${{ matrix.target }}\release\atomic.exe" -Destination "$DIR\bin\"
-          Copy-Item "README.md" -Destination "$DIR\"
-          Copy-Item "examples\*" -Destination "$DIR\examples\" -Recurse -Force -ErrorAction SilentlyContinue
-
-          if ("${{ matrix.link_type }}" -eq "default") {
-            $dll = Get-ChildItem "C:\llvm\bin" -Filter "LLVM.dll" -ErrorAction SilentlyContinue | Select-Object -First 1
-            if (-not $dll) {
-              Write-Error "Could not find LLVM.dll in C:\llvm\bin"
-              Get-ChildItem "C:\llvm\bin\*.dll" -ErrorAction SilentlyContinue
-              exit 1
-            }
-            Copy-Item $dll.FullName -Destination "$DIR\bin\"
-          }
-
-          $archive = "${PKG}.zip"
-          Compress-Archive -Path "$DIR" -DestinationPath "C:\${archive}"
-          echo "file=${archive}" >> $env:GITHUB_OUTPUT
-
-      - name: Upload artifact (Linux)
-        if: runner.os == 'Linux'
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.name }}
           path: /tmp/${{ steps.pkg.outputs.file }}
-          if-no-files-found: error
-
-      - name: Upload artifact (Windows)
-        if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.name }}
-          path: C:\${{ steps.pkg.outputs.file }}
           if-no-files-found: error
 
   release:
@@ -264,7 +179,7 @@ jobs:
       - name: Flatten artifacts
         run: |
           mkdir -p /tmp/release-assets
-          find /tmp/artifacts -type f \( -name '*.tar.gz' -o -name '*.zip' \) \
+          find /tmp/artifacts -type f -name '*.tar.gz' \
             -exec cp {} /tmp/release-assets/ \;
           echo "Assets to upload:"
           ls -lh /tmp/release-assets/
@@ -278,7 +193,7 @@ jobs:
           body: |
             ## Atomic Language Compiler v${{ steps.ver.outputs.value }}
 
-            Pre-built binaries for all supported platforms.
+            Pre-built binaries for Linux x64 and ARM64.
 
             ### Linux x64
             - [Default](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-linux-x64.tar.gz) -- bundled LLVM, ready to use
@@ -290,14 +205,9 @@ jobs:
             - [Static](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-linux-arm64-static.tar.gz)
             - [Dynamic](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-linux-arm64-dynamic.tar.gz)
 
-            ### Windows x64
-            - [Default](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-windows-x64.zip) -- bundled LLVM, ready to use
-            - [Static](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-windows-x64-static.zip)
-            - [Dynamic](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-windows-x64-dynamic.zip)
-
             ### 版本说明
             - **Default** — 动态链接 + 打包 LLVM 共享库，开箱即用，推荐大多数用户使用
-            - **Static** — LLVM 静态编译进二进制，单文件即可运行，体积较大 (~150MB)
+            - **Static** — LLVM 静态编译进二进制，单文件即可运行，体积较大
             - **Dynamic** — 不携带 LLVM 库，体积最小，需自行安装 LLVM 21
 
             ### Installation
