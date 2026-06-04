@@ -9,6 +9,7 @@ use super::{CodeGen, TypedValue, ValKind, Scope, llvm_err};
 
 impl<'ctx> CodeGen<'ctx> {
     /// Return a type hint string for an expression AST (without compiling it).
+    #[allow(dead_code)]
     pub(super) fn expr_type_hint(&self, expr: &Expr) -> &'static str {
         match expr {
             Expr::Literal(Literal::String(_)) => "String",
@@ -58,6 +59,12 @@ impl<'ctx> CodeGen<'ctx> {
                 "Int"
             }
             Expr::StructLiteral(_) => "Struct",
+            Expr::When(w) => match &w.kind {
+                WhenKind::OneLine { then_expr, .. } => self.expr_type_hint(then_expr),
+                WhenKind::ValueMatch { arms, .. } | WhenKind::ConditionChain { arms } => {
+                    arms.first().map(|a| self.expr_type_hint(&a.body)).unwrap_or("Int")
+                }
+            },
             _ => "Int",
         }
     }

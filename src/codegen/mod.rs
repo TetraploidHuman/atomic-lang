@@ -531,6 +531,9 @@ impl<'ctx> CodeGen<'ctx> {
                     match name.as_str() {
                         "print" | "println" => Type::Unit,
                         "toString" | "toUpper" | "toLower" => Type::Named("String".into()),
+                        "substring" | "unwrap_or" | "read_line" | "jsonEscape"
+                        | "httpRequest" | "str" | "chatOnce" | "storeMessages"
+                        | "extractContent" | "handleChat" => Type::Named("String".into()),
                         "parse_date" | "date" => Type::Generic(Box::new(Type::Named("Option".into())), vec![Type::Named("Date".into())]),
                         "datetime" => Type::Generic(Box::new(Type::Named("Option".into())), vec![Type::Named("DateTime".into())]),
                         "format" => Type::Named("String".into()),

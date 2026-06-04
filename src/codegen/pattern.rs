@@ -620,14 +620,11 @@ impl<'ctx> CodeGen<'ctx> {
         let then_diverges = matches!(then_expr, Expr::Continue | Expr::Break);
         let else_diverges = matches!(else_expr, Expr::Continue | Expr::Break);
 
-        // Result type hint from the non-divergent branch
-        let result_hint = if !then_diverges { self.expr_type_hint(then_expr) }
-                          else if !else_diverges { self.expr_type_hint(else_expr) }
-                          else { "Int" };
-        let result_ty: BasicTypeEnum = match result_hint {
-            "String" => self.string_type.into(),
-            _ => self.i64_ty().into(),
-        };
+        // Infer result type from the non-divergent branch
+        let result_type = if !then_diverges { self.infer_expr_type(then_expr) }
+                          else if !else_diverges { self.infer_expr_type(else_expr) }
+                          else { Type::Named("Int".into()) };
+        let result_ty: BasicTypeEnum = self.ast_type_to_basic_type(&result_type);
 
         let then_block = self.context.append_basic_block(current_fn, "when_then");
         let else_block = self.context.append_basic_block(current_fn, "when_else");

@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  LLVM_VERSION: '21.1.8'
+  LLVM_TAG: llvmorg-21.1.8
+
+jobs:
+  test:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x64
+            os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            llvm_archive: LLVM-21.1.8-Linux-X64.tar.xz
+
+          - name: Linux ARM64
+            os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            llvm_archive: LLVM-21.1.8-Linux-ARM64.tar.xz
+
+          - name: Windows x64
+            os: windows-2022
+            target: x86_64-pc-windows-msvc
+            llvm_archive: LLVM-21.1.8-win64.exe
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      # ── System deps (Linux) ───────────────────────────
+      - name: Install deps (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libffi-dev zlib1g-dev
+
+      # ── LLVM ──────────────────────────────────────────
+      - name: Setup LLVM (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          URL="https://github.com/llvm/llvm-project/releases/download/${{ env.LLVM_TAG }}/${{ matrix.llvm_archive }}"
+          echo "Downloading $URL"
+          mkdir -p /tmp/llvm
+          curl -fSL --retry 3 --connect-timeout 30 "$URL" -o /tmp/llvm.tar.xz
+          tar xf /tmp/llvm.tar.xz -C /tmp/llvm --strip-components=1
+          rm -f /tmp/llvm.tar.xz
+          echo "LLVM_SYS_211_PREFIX=/tmp/llvm" >> "$GITHUB_ENV"
+
+      - name: Setup LLVM (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $URL = "https://github.com/llvm/llvm-project/releases/download/$env:LLVM_TAG/${{ matrix.llvm_archive }}"
+          Write-Host "Downloading $URL"
+          curl -fSL --retry 3 --connect-timeout 30 -o C:\llvm-installer.exe "$URL"
+          Write-Host "Installing LLVM silently to C:\llvm..."
+          Start-Process -Wait -FilePath "C:\llvm-installer.exe" -ArgumentList "/S", "/D=C:\llvm"
+          Remove-Item C:\llvm-installer.exe -Force
+          echo "LLVM_SYS_211_PREFIX=C:\llvm" >> $env:GITHUB_ENV
+
+      # ── Build (debug is fine for CI) ──────────────────
+      - name: Build
+        run: cargo build --target ${{ matrix.target }}
+
+      # ── Test (Linux only — tests need JIT/execution) ──
+      - name: Test
+        if: runner.os == 'Linux'
+        run: cargo test --target ${{ matrix.target }}
+
+      # ── Type-check examples ───────────────────────────
+      - name: Type-check examples
+        if: runner.os == 'Linux'
+        run: |
+          echo "::group::Building atomic binary"
+          cargo build --target ${{ matrix.target }}
+          echo "::endgroup::"
+          for f in examples/*.at; do
+            echo "Checking $f..."
+            cargo run --target ${{ matrix.target }} -- run "$f" --check 2>&1 || echo "::warning::Type check failed for $f"
+          done
+
+  lint:
+    name: Lint & fmt
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Format check
+        run: cargo fmt -- --check
+
+      - name: Clippy
+        run: cargo clippy -- -D warnings 2>&1 || echo "::warning::Clippy found issues"

@@ -691,6 +691,10 @@ impl TypeChecker {
                 }
             }
             Expr::FieldAccess(_, _) => Type::Named("Int".into()),
+            Expr::Unary(op, inner) => match op {
+                UnaryOp::Not => Type::Named("Bool".into()),
+                UnaryOp::Neg | UnaryOp::BitNot => self.infer_expr_type(inner),
+            },
             _ => Type::Named("Int".into()),
         }
     }
