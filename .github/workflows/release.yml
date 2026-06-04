@@ -30,7 +30,7 @@ jobs:
             target: x86_64-pc-windows-msvc
             arch: x64
             ext: zip
-            llvm_archive: LLVM-21.1.8-win64.exe
+            llvm_archive: clang+llvm-21.1.8-x86_64-pc-windows-msvc.tar.xz
 
     steps:
       - uses: actions/checkout@v4
@@ -72,13 +72,23 @@ jobs:
 
       - name: Setup LLVM (Windows)
         if: runner.os == 'Windows'
-        shell: cmd
+        shell: pwsh
         run: |
-          curl.exe -fSL --retry 3 --connect-timeout 30 -o C:\llvm-installer.exe "https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.8/${{ matrix.llvm_archive }}"
-          C:\llvm-installer.exe /S /D=C:\llvm
-          del /f C:\llvm-installer.exe
-          dir C:\llvm
-          echo LLVM_SYS_211_PREFIX=C:\llvm >> %GITHUB_ENV%
+          $URL = "https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.8/${{ matrix.llvm_archive }}"
+          Write-Host "Downloading $URL"
+          curl.exe -fSL --retry 3 --connect-timeout 30 -o C:\llvm.tar.xz "$URL"
+          Write-Host "Extracting..."
+          New-Item -Force -ItemType Directory -Path C:\llvm-extract | Out-Null
+          tar -xf C:\llvm.tar.xz -C C:\llvm-extract
+          Remove-Item C:\llvm.tar.xz -Force
+          $innerDir = Get-ChildItem C:\llvm-extract -Directory | Select-Object -First 1
+          if ($innerDir) {
+            Move-Item $innerDir.FullName C:\llvm -Force
+          } else {
+            Rename-Item C:\llvm-extract C:\llvm -Force
+          }
+          Remove-Item C:\llvm-extract -Recurse -Force -ErrorAction SilentlyContinue
+          echo "LLVM_SYS_211_PREFIX=C:\llvm" >> $env:GITHUB_ENV
 
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
