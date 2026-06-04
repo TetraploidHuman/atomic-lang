@@ -22,57 +22,57 @@ jobs:
           - name: linux-x64
             os: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
-            link_type: default
+            suffix: ''
             llvm_archive: LLVM-21.1.8-Linux-X64.tar.xz
 
           - name: linux-x64-static
             os: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
-            link_type: static
+            suffix: -static
             llvm_archive: LLVM-21.1.8-Linux-X64.tar.xz
 
           - name: linux-x64-dynamic
             os: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
-            link_type: dynamic
+            suffix: -dynamic
             llvm_archive: LLVM-21.1.8-Linux-X64.tar.xz
 
           # Linux ARM64
           - name: linux-arm64
             os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
-            link_type: default
+            suffix: ''
             llvm_archive: LLVM-21.1.8-Linux-ARM64.tar.xz
 
           - name: linux-arm64-static
             os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
-            link_type: static
+            suffix: -static
             llvm_archive: LLVM-21.1.8-Linux-ARM64.tar.xz
 
           - name: linux-arm64-dynamic
             os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
-            link_type: dynamic
+            suffix: -dynamic
             llvm_archive: LLVM-21.1.8-Linux-ARM64.tar.xz
 
           # Windows x64
           - name: windows-x64
             os: windows-2022
             target: x86_64-pc-windows-msvc
-            link_type: default
+            suffix: ''
             llvm_archive: LLVM-21.1.8-win64.exe
 
           - name: windows-x64-static
             os: windows-2022
             target: x86_64-pc-windows-msvc
-            link_type: static
+            suffix: -static
             llvm_archive: LLVM-21.1.8-win64.exe
 
           - name: windows-x64-dynamic
             os: windows-2022
             target: x86_64-pc-windows-msvc
-            link_type: dynamic
+            suffix: -dynamic
             llvm_archive: LLVM-21.1.8-win64.exe
 
     steps:
@@ -100,7 +100,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq libffi-dev zlib1g-dev patchelf
+          sudo apt-get install -y -qq libffi-dev zlib1g-dev
 
       - name: Setup LLVM (Linux)
         if: runner.os == 'Linux'
@@ -125,34 +125,8 @@ jobs:
           Remove-Item C:\llvm-installer.exe -Force
           echo "LLVM_SYS_211_PREFIX=C:\llvm" >> $env:GITHUB_ENV
 
-      - name: Force static linking (Linux)
-        if: runner.os == 'Linux' && matrix.link_type == 'static'
-        run: |
-          find /tmp/llvm/lib -maxdepth 1 -name 'libLLVM.so*' -delete 2>/dev/null || true
-
-      - name: Force static linking (Windows)
-        if: runner.os == 'Windows' && matrix.link_type == 'static'
-        shell: pwsh
-        run: |
-          Remove-Item C:\llvm\bin\LLVM.dll -Force -ErrorAction SilentlyContinue
-          Remove-Item C:\llvm\lib\LLVM.lib -Force -ErrorAction SilentlyContinue
-
-      - name: Build (Linux non-static)
-        if: runner.os == 'Linux' && matrix.link_type != 'static'
-        run: |
-          export RUSTFLAGS='-C link-args=-Wl,-rpath,$ORIGIN/../lib'
-          cargo build --release --target ${{ matrix.target }}
-
-      - name: Build (Linux static)
-        if: runner.os == 'Linux' && matrix.link_type == 'static'
-        run: |
-          cargo build --release --target ${{ matrix.target }}
-
-      - name: Build (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          cargo build --release --target ${{ matrix.target }}
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
 
       - name: Smoke test (Linux)
         if: runner.os == 'Linux'
@@ -166,39 +140,16 @@ jobs:
           set -euo pipefail
           VER="${{ steps.ver.outputs.value }}"
           ARCH="${{ contains(matrix.target, 'aarch64') && 'arm64' || 'x64' }}"
-          LT="${{ matrix.link_type }}"
-          if [ "$LT" = "default" ]; then
-            SUFFIX=""
-          else
-            SUFFIX="-$LT"
-          fi
-          PKG="atomic-${VER}-linux-${ARCH}${SUFFIX}"
+          PKG="atomic-${VER}-linux-${ARCH}${{ matrix.suffix }}"
           DIR="/tmp/${PKG}"
 
-          mkdir -p "${DIR}/bin" "${DIR}/lib" "${DIR}/examples"
+          mkdir -p "${DIR}/bin" "${DIR}/examples"
 
           cp "target/${{ matrix.target }}/release/atomic" "${DIR}/bin/"
           cp README.md "${DIR}/"
           cp -r examples/* "${DIR}/examples/" 2>/dev/null || true
 
           strip "${DIR}/bin/atomic" 2>/dev/null || true
-
-          if [ "$LT" = "default" ]; then
-            echo "::notice::=== All libLLVM files in /tmp/llvm/lib ==="
-            echo "::notice::$(ls -la /tmp/llvm/lib/libLLVM* 2>&1 || echo 'NO libLLVM* files found')"
-            echo "::notice::=== All .so files in /tmp/llvm/lib ==="
-            echo "::notice::$(ls -la /tmp/llvm/lib/*.so* 2>&1 || echo 'NO .so files found')"
-            echo "::notice::=== Full /tmp/llvm/lib listing ==="
-            echo "::notice::$(ls -la /tmp/llvm/lib/ 2>&1 | head -20 || echo 'ls failed')"
-            LLVM_SO=$(find /tmp/llvm -type f -name 'libLLVM*.so*' ! -name '*.a' 2>/dev/null | head -1)
-            if [ -z "$LLVM_SO" ]; then
-              echo "::error::Could not find libLLVM.so anywhere under /tmp/llvm"
-              exit 1
-            fi
-            echo "::notice::Found LLVM shared library: $LLVM_SO"
-            cp "$LLVM_SO" "${DIR}/lib/"
-            patchelf --set-rpath '$ORIGIN/../lib' "${DIR}/bin/atomic"
-          fi
 
           cd /tmp
           tar czf "${PKG}.tar.gz" "${PKG}"
@@ -211,31 +162,15 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $VER = "${{ steps.ver.outputs.value }}"
-          if ("${{ matrix.link_type }}" -eq "default") {
-            $SUFFIX = ""
-          } else {
-            $SUFFIX = "-${{ matrix.link_type }}"
-          }
-          $PKG = "atomic-${VER}-windows-x64${SUFFIX}"
+          $PKG = "atomic-${VER}-windows-x64${{ matrix.suffix }}"
           $DIR = "C:\${PKG}"
 
           New-Item -ItemType Directory -Force -Path "$DIR\bin" | Out-Null
-          New-Item -ItemType Directory -Force -Path "$DIR\lib" | Out-Null
           New-Item -ItemType Directory -Force -Path "$DIR\examples" | Out-Null
 
           Copy-Item "target\${{ matrix.target }}\release\atomic.exe" -Destination "$DIR\bin\"
           Copy-Item "README.md" -Destination "$DIR\"
           Copy-Item "examples\*" -Destination "$DIR\examples\" -Recurse -Force -ErrorAction SilentlyContinue
-
-          if ("${{ matrix.link_type }}" -eq "default") {
-            $dll = Get-ChildItem "C:\llvm\bin" -Filter "LLVM.dll" -ErrorAction SilentlyContinue | Select-Object -First 1
-            if (-not $dll) {
-              Write-Error "Could not find LLVM.dll in C:\llvm\bin"
-              Get-ChildItem "C:\llvm\bin\*.dll" -ErrorAction SilentlyContinue
-              exit 1
-            }
-            Copy-Item $dll.FullName -Destination "$DIR\bin\"
-          }
 
           $archive = "${PKG}.zip"
           Compress-Archive -Path "$DIR" -DestinationPath "C:\${archive}"
@@ -293,29 +228,25 @@ jobs:
           body: |
             ## Atomic Language Compiler v${{ steps.ver.outputs.value }}
 
-            Pre-built binaries for all supported platforms.
+            Pre-built binaries for all supported platforms. All packages are
+            statically linked against LLVM — download any variant, the binary
+            is self-contained.
 
             ### Linux x64
-            - [Default](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-linux-x64.tar.gz) -- bundled LLVM, ready to use
-            - [Static](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-linux-x64-static.tar.gz) -- self-contained, LLVM baked in
-            - [Dynamic](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-linux-x64-dynamic.tar.gz) -- needs LLVM 21 installed
+            - [atomic-${{ steps.ver.outputs.value }}-linux-x64.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-linux-x64.tar.gz)
+            - [atomic-${{ steps.ver.outputs.value }}-linux-x64-static.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-linux-x64-static.tar.gz)
+            - [atomic-${{ steps.ver.outputs.value }}-linux-x64-dynamic.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-linux-x64-dynamic.tar.gz)
 
             ### Linux ARM64
-            - [Default](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-linux-arm64.tar.gz) -- bundled LLVM, ready to use
-            - [Static](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-linux-arm64-static.tar.gz)
-            - [Dynamic](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-linux-arm64-dynamic.tar.gz)
+            - [atomic-${{ steps.ver.outputs.value }}-linux-arm64.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-linux-arm64.tar.gz)
+            - [atomic-${{ steps.ver.outputs.value }}-linux-arm64-static.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-linux-arm64-static.tar.gz)
+            - [atomic-${{ steps.ver.outputs.value }}-linux-arm64-dynamic.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-linux-arm64-dynamic.tar.gz)
 
             ### Windows x64
-            - [Default](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-windows-x64.zip) -- bundled LLVM, ready to use
-            - [Static](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-windows-x64-static.zip)
-            - [Dynamic](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-windows-x64-dynamic.zip)
-
-            ### 版本说明
-            - **Default** — 动态链接 + 打包 LLVM 共享库，开箱即用，推荐大多数用户使用
-            - **Static** — LLVM 静态编译进二进制，单文件即可运行，体积较大 (~150MB)
-            - **Dynamic** — 不携带 LLVM 库，体积最小，需自行安装 LLVM 21
+            - [atomic-${{ steps.ver.outputs.value }}-windows-x64.zip](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-windows-x64.zip)
+            - [atomic-${{ steps.ver.outputs.value }}-windows-x64-static.zip](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-windows-x64-static.zip)
+            - [atomic-${{ steps.ver.outputs.value }}-windows-x64-dynamic.zip](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-windows-x64-dynamic.zip)
 
             ### Installation
             Extract the archive and add the `bin/` directory to your PATH.
-            For default builds, keep the `lib/` directory next to `bin/`.
           generate_release_notes: true
