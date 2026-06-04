@@ -1,0 +1,84 @@
+// DeepSeek AI Chat
+fun main() {
+    println("=== DeepSeek AI Chat ===")
+    println("Type 'quit' to exit")
+    println("")
+
+    var messages = ""
+    var running = true
+    for running {
+        print("You: ")
+        val input = unwrap_or(read_line(), "quit")
+        running = when input == "quit" { false else true }
+        messages = when running { handleChat(input, messages) else messages }
+    }
+    println("Goodbye!")
+}
+
+fun handleChat(input: String, msgs: String): String = {
+    print("AI: ")
+    val content = chatOnce(input, msgs)
+    println(content)
+    storeMessages(input, content, msgs)
+}
+
+fun chatOnce(input: String, msgs: String): String = {
+    val userMsg = "{\"role\": \"user\", \"content\": \"" + jsonEscape(input) + "\"}"
+    val newMsgs = when msgs == "" { userMsg else msgs + ", " + userMsg }
+    val body = "{\"model\": \"deepseek-chat\", \"messages\": [" + newMsgs + "]}"
+    val headers = "Authorization: Bearer sk-83dcfb84f4e945df9dadf73257781119\nContent-Type: application/json"
+    val resp = httpRequest("POST", "https://api.deepseek.com/chat/completions", headers, body)
+    extractContent(resp)
+}
+
+fun storeMessages(input: String, content: String, msgs: String): String = {
+    val userMsg = "{\"role\": \"user\", \"content\": \"" + jsonEscape(input) + "\"}"
+    val assistantMsg = "{\"role\": \"assistant\", \"content\": \"" + jsonEscape(content) + "\"}"
+    when msgs == "" { userMsg + ", " + assistantMsg else msgs + ", " + userMsg + ", " + assistantMsg }
+}
+
+fun extractContent(raw: String): String = {
+    val nl = findChar(raw, "\n")
+    val json = substring(raw, nl + 1, len(raw) - nl - 1)
+    val start = findSubstr(json, "\"content\":\"")
+    val from = start + 11
+    val end = findQuote(json, from)
+    when start >= 0 { substring(json, from, end - from) else raw }
+}
+
+fun findChar(s: String, pat: String): Int = {
+    var pos = -1
+    var i = 0
+    for i <= len(s) - len(pat) and pos == -1 {
+        val match = substring(s, i, len(pat)) == pat
+        pos = when match { i else -1 }
+        i = i + when pos >= 0 { 0 else 1 }
+    }
+    pos
+}
+
+fun findSubstr(s: String, pat: String): Int = findChar(s, pat)
+
+fun findQuote(s: String, from: Int): Int = {
+    var pos = -1
+    var i = from
+    for i < len(s) and pos == -1 {
+        val ch = substring(s, i, 1)
+        val escaped = i > 0 and substring(s, i - 1, 1) == "\\"
+        pos = when ch == "\"" and not escaped { i else -1 }
+        i = i + 1
+    }
+    pos
+}
+
+fun jsonEscape(s: String): String = {
+    var r = ""
+    var i = 0
+    for i < len(s) {
+        val ch = substring(s, i, 1)
+        val esc = when ch == "\"" { "\\\"" else when ch == "\\" { "\\\\" else when ch == "\n" { "\\n" else when ch == "\r" { "\\r" else when ch == "\t" { "\\t" else ch } } } } }
+        r = r + esc
+        i = i + 1
+    }
+    r
+}

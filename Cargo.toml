@@ -1,0 +1,16 @@
+[package]
+name = "atomic"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "atomic"
+path = "src/main.rs"
+
+[dependencies]
+inkwell = { version = "0.5", features = ["llvm18-0"] }
+clap = { version = "4", features = ["derive"] }
+ariadne = "0.4"
+toml = "1.0"
+
+[dev-dependencies]
