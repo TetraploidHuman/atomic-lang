@@ -184,13 +184,18 @@ jobs:
           strip "${DIR}/bin/atomic" 2>/dev/null || true
 
           if [ "$LT" = "default" ]; then
-            ls -la /tmp/llvm/lib/libLLVM* 2>/dev/null || true
-            LLVM_SO=$(find /tmp/llvm/lib -maxdepth 1 -name 'libLLVM.so*' ! -name '*.a' ! -name '*.gz' ! -name '*.bz2' 2>/dev/null | head -1)
+            echo "::notice::=== All libLLVM files in /tmp/llvm/lib ==="
+            echo "::notice::$(ls -la /tmp/llvm/lib/libLLVM* 2>&1 || echo 'NO libLLVM* files found')"
+            echo "::notice::=== All .so files in /tmp/llvm/lib ==="
+            echo "::notice::$(ls -la /tmp/llvm/lib/*.so* 2>&1 || echo 'NO .so files found')"
+            echo "::notice::=== Full /tmp/llvm/lib listing ==="
+            echo "::notice::$(ls -la /tmp/llvm/lib/ 2>&1 | head -20 || echo 'ls failed')"
+            LLVM_SO=$(find /tmp/llvm -type f -name 'libLLVM*.so*' ! -name '*.a' 2>/dev/null | head -1)
             if [ -z "$LLVM_SO" ]; then
-              echo "::error::Could not find libLLVM.so in /tmp/llvm/lib"
+              echo "::error::Could not find libLLVM.so anywhere under /tmp/llvm"
               exit 1
             fi
-            echo "Found: $LLVM_SO"
+            echo "::notice::Found LLVM shared library: $LLVM_SO"
             cp "$LLVM_SO" "${DIR}/lib/"
             patchelf --set-rpath '$ORIGIN/../lib' "${DIR}/bin/atomic"
           fi
