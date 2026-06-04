@@ -25,7 +25,7 @@ jobs:
             llvm_archive: LLVM-21.1.8-Linux-X64.tar.xz
 
           - name: Windows x64
-            os: windows-2022
+            os: windows-2025
             target: x86_64-pc-windows-msvc
             llvm_archive: clang+llvm-21.1.8-x86_64-pc-windows-msvc.tar.xz
 
