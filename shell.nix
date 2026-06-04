@@ -2,9 +2,9 @@
 
 pkgs.mkShell {
   buildInputs = with pkgs; [
-    llvmPackages_18.llvm
-    llvmPackages_18.libllvm
-    llvmPackages_18.libclang
+    llvmPackages_21.llvm
+    llvmPackages_21.libllvm
+    llvmPackages_21.libclang
     pkg-config
     rustc
     cargo
@@ -22,8 +22,8 @@ pkgs.mkShell {
     binutils
   ];
 
-  LLVM_SYS_180_PREFIX = "${pkgs.llvmPackages_18.llvm.dev}";
-  LLVM_CONFIG_PATH = "${pkgs.llvmPackages_18.llvm.dev}/bin/llvm-config";
+  LLVM_SYS_211_PREFIX = "${pkgs.llvmPackages_21.llvm.dev}";
+  LLVM_CONFIG_PATH = "${pkgs.llvmPackages_21.llvm.dev}/bin/llvm-config";
 
   shellHook = ''
     echo "Atomic Language Development Environment"

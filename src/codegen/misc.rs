@@ -45,7 +45,7 @@ impl<'ctx> CodeGen<'ctx> {
             TypedValue::List(list_ptr) | TypedValue::LazyList(list_ptr) => {
                 let list_val = self.load_list(list_ptr)?;
                 let cc = self.call_rt("atomic_list_get", &[list_val.into(), index_val.into()])?;
-                match cc.try_as_basic_value().left() {
+                match cc.try_as_basic_value().basic() {
                     Some(bv) => {
                         // list_get returns {i64, ptr} fat struct — the universal value repr.
                         // Store in string alloca; callers extract fields as needed.
@@ -89,7 +89,7 @@ impl<'ctx> CodeGen<'ctx> {
             .ok_or("atomic_map_contains not found")?;
         let cc = self.builder.build_call(contains_fn, &[map_loaded.into(), key_fat.into()], "contains")
             .map_err(llvm_err)?;
-        let contains = cc.try_as_basic_value().left().ok_or("contains failed")?.into_int_value();
+        let contains = cc.try_as_basic_value().basic().ok_or("contains failed")?.into_int_value();
 
         let current_fn = self.builder.get_insert_block()
             .and_then(|b| b.get_parent())
@@ -110,14 +110,14 @@ impl<'ctx> CodeGen<'ctx> {
         let key_fat2 = self.to_fat_struct(&key_val2)?;
         let gc = self.builder.build_call(get_fn, &[map_loaded2.into(), key_fat2.into()], "get")
             .map_err(llvm_err)?;
-        let val_fat = gc.try_as_basic_value().left().ok_or("map_get failed")?.into_struct_value();
+        let val_fat = gc.try_as_basic_value().basic().ok_or("map_get failed")?.into_struct_value();
         // Allocate heap space for the value (16 bytes for fat struct)
         let sixteen = self.i64_ty().const_int(16, false);
         let malloc_fn = self.module.get_function("malloc")
             .ok_or("malloc not found")?;
         let heap_ptr = self.builder.build_call(malloc_fn, &[sixteen.into()], "heap_val")
             .map_err(llvm_err)?
-            .try_as_basic_value().left().ok_or("malloc failed")?.into_pointer_value();
+            .try_as_basic_value().basic().ok_or("malloc failed")?.into_pointer_value();
         self.builder.build_store(heap_ptr, val_fat).map_err(llvm_err)?;
         let undef = option_ty.get_undef();
         let r1 = self.builder.build_insert_value(undef, self.i64_ty().const_int(some_tag, false), 0, "some_tag")
@@ -162,7 +162,7 @@ impl<'ctx> CodeGen<'ctx> {
             .ok_or("atomic_map_contains not found")?;
         let cc = self.builder.build_call(contains_fn, &[set_loaded.into(), elem_fat.into()], "contains")
             .map_err(llvm_err)?;
-        let contains = cc.try_as_basic_value().left().ok_or("contains failed")?.into_int_value();
+        let contains = cc.try_as_basic_value().basic().ok_or("contains failed")?.into_int_value();
 
         let current_fn = self.builder.get_insert_block()
             .and_then(|b| b.get_parent())
@@ -182,7 +182,7 @@ impl<'ctx> CodeGen<'ctx> {
         let malloc_fn = self.module.get_function("malloc").ok_or("malloc not found")?;
         let heap_ptr = self.builder.build_call(malloc_fn, &[sixteen.into()], "heap_elem")
             .map_err(llvm_err)?
-            .try_as_basic_value().left().ok_or("malloc failed")?.into_pointer_value();
+            .try_as_basic_value().basic().ok_or("malloc failed")?.into_pointer_value();
         self.builder.build_store(heap_ptr, elem_fat2).map_err(llvm_err)?;
         let undef = option_ty.get_undef();
         let r1 = self.builder.build_insert_value(undef, self.i64_ty().const_int(some_tag, false), 0, "some_tag")
@@ -480,7 +480,7 @@ impl<'ctx> CodeGen<'ctx> {
                     None => Some(ptr),
                     Some(acc) => {
                         let cc = self.call_rt_with_2str("atomic_string_concat", acc, ptr)?;
-                        match cc.try_as_basic_value().left() {
+                        match cc.try_as_basic_value().basic() {
                             Some(bv) => {
                                 let alloca = self.builder.build_alloca(self.string_type, "interp").map_err(llvm_err)?;
                                 self.builder.build_store(alloca, bv).map_err(llvm_err)?;
@@ -506,7 +506,7 @@ impl<'ctx> CodeGen<'ctx> {
         match val {
             TypedValue::Int(iv) => {
                 let cc = self.call_rt("atomic_int_to_string", &[(*iv).into()])?;
-                match cc.try_as_basic_value().left() {
+                match cc.try_as_basic_value().basic() {
                     Some(bv) => {
                         let alloca = self.builder.build_alloca(self.string_type, "int_str").map_err(llvm_err)?;
                         self.builder.build_store(alloca, bv).map_err(llvm_err)?;
@@ -517,7 +517,7 @@ impl<'ctx> CodeGen<'ctx> {
             }
             TypedValue::Float(fv) => {
                 let cc = self.call_rt("atomic_float_to_string", &[(*fv).into()])?;
-                match cc.try_as_basic_value().left() {
+                match cc.try_as_basic_value().basic() {
                     Some(bv) => {
                         let alloca = self.builder.build_alloca(self.string_type, "float_str").map_err(llvm_err)?;
                         self.builder.build_store(alloca, bv).map_err(llvm_err)?;
@@ -818,7 +818,7 @@ impl<'ctx> CodeGen<'ctx> {
                 }
             }
             let cc = self.builder.build_call(fn_val, &ca, "ufcs").map_err(llvm_err)?;
-            match cc.try_as_basic_value().left() {
+            match cc.try_as_basic_value().basic() {
                 Some(bv) => self.bv_to_typed(bv),
                 None => Ok(TypedValue::Unit),
             }

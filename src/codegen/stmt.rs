@@ -104,7 +104,7 @@ impl<'ctx> CodeGen<'ctx> {
                         // Create new list
                         let cap = self.i64_ty().const_int(4, false);
                         let new_list_cc = self.call_rt("atomic_list_create", &[cap.into()])?;
-                        let new_list_bv = new_list_cc.try_as_basic_value().left().ok_or("rest list create fail")?;
+                        let new_list_bv = new_list_cc.try_as_basic_value().basic().ok_or("rest list create fail")?;
                         let rest_alloca = self.builder.build_alloca(self.list_type, rest_name).map_err(llvm_err)?;
                         self.builder.build_store(rest_alloca, new_list_bv).map_err(llvm_err)?;
                         // Copy remaining elements via loop
@@ -129,7 +129,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let elem = self.builder.build_load(self.string_type, src_ptr, "rest_elem").map_err(llvm_err)?;
                         let rest_loaded = self.load_list(rest_alloca)?;
                         let pushed = self.call_rt("atomic_list_push", &[rest_loaded.into(), elem.into()])?;
-                        let new_rest = pushed.try_as_basic_value().left().ok_or("rest push fail")?;
+                        let new_rest = pushed.try_as_basic_value().basic().ok_or("rest push fail")?;
                         self.builder.build_store(rest_alloca, new_rest).map_err(llvm_err)?;
                         let next_i = self.builder.build_int_add(
                             i_phi.as_basic_value().into_int_value(),

@@ -392,7 +392,7 @@ impl<'ctx> CodeGen<'ctx> {
         let func = self.module.get_function("atomic_malloc_rc")
             .ok_or("atomic_malloc_rc not found")?;
         let result = self.builder.build_call(func, &[size.into()], "malloc_rc").map_err(llvm_err)?;
-        Ok(result.try_as_basic_value().left().unwrap().into_pointer_value())
+        Ok(result.try_as_basic_value().unwrap_basic().into_pointer_value())
     }
 
     /// Increment refcount on a heap-allocated value.

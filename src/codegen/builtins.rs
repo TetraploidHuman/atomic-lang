@@ -322,7 +322,7 @@ impl<'ctx> CodeGen<'ctx> {
                 }
 
                 let cc = self.builder.build_call(fn_val, &ca, "").map_err(llvm_err)?;
-                return match cc.try_as_basic_value().left() {
+                return match cc.try_as_basic_value().basic() {
                     Some(bv) => self.bv_to_typed(bv),
                     None => Ok(TypedValue::Unit),
                 };
@@ -346,7 +346,7 @@ impl<'ctx> CodeGen<'ctx> {
                 }
 
                 let cc = self.builder.build_call(fn_val, &ca, "").map_err(llvm_err)?;
-                return match cc.try_as_basic_value().left() {
+                return match cc.try_as_basic_value().basic() {
                     Some(bv) => self.bv_to_typed(bv),
                     None => Ok(TypedValue::Unit),
                 };
@@ -387,7 +387,7 @@ impl<'ctx> CodeGen<'ctx> {
                         ca.push(casted.into());
                     }
                     let cc = self.builder.build_call(fn_val, &ca, "").map_err(llvm_err)?;
-                    return match cc.try_as_basic_value().left() {
+                    return match cc.try_as_basic_value().basic() {
                         Some(bv) => self.bv_to_typed(bv),
                         None => Ok(TypedValue::Unit),
                     };
@@ -716,7 +716,7 @@ impl<'ctx> CodeGen<'ctx> {
                         self.builder.position_at_end(got_data_bb);
                         let lv2 = self.load_list(list_ptr)?;
                         let fat = self.call_rt("atomic_list_get", &[lv2.into(), zero.into()])?;
-                        let fat = fat.try_as_basic_value().left().ok_or("receive get failed")?.into_struct_value();
+                        let fat = fat.try_as_basic_value().basic().ok_or("receive get failed")?.into_struct_value();
                         let tag = self.builder.build_extract_value(fat, 0, "tag").map_err(llvm_err)?.into_int_value();
                         let data_ptr = self.builder.build_extract_value(lv2, 0, "data").map_err(llvm_err)?.into_pointer_value();
                         let len2 = self.builder.build_extract_value(lv2, 1, "len").map_err(llvm_err)?.into_int_value();
@@ -802,7 +802,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let list_val = self.load_list(list_alloca)?;
                         let zero = self.i64_ty().const_int(0, false);
                         let cc = self.call_rt("atomic_list_get", &[list_val.into(), zero.into()])?;
-                        let fat = cc.try_as_basic_value().left().ok_or("wait get failed")?.into_struct_value();
+                        let fat = cc.try_as_basic_value().basic().ok_or("wait get failed")?.into_struct_value();
                         let tag = self.builder.build_extract_value(fat, 0, "tag").map_err(llvm_err)?.into_int_value();
                         return Ok(TypedValue::Int(tag));
                     }
@@ -866,7 +866,7 @@ impl<'ctx> CodeGen<'ctx> {
                     ca.push(casted.into());
                 }
                 let cc = self.builder.build_call(fn_val, &ca, "").map_err(llvm_err)?;
-                return match cc.try_as_basic_value().left() {
+                return match cc.try_as_basic_value().basic() {
                     Some(bv) => self.bv_to_typed(bv),
                     None => Ok(TypedValue::Unit),
                 };
@@ -898,7 +898,7 @@ impl<'ctx> CodeGen<'ctx> {
 
                 let cc = self.builder.build_indirect_call(fn_type, fn_ptr, &ca, "indirect")
                     .map_err(llvm_err)?;
-                match cc.try_as_basic_value().left() {
+                match cc.try_as_basic_value().basic() {
                     Some(bv) => self.unpack_fat_return(bv, fn_type.get_return_type()),
                     None => Ok(TypedValue::Unit),
                 }
@@ -927,7 +927,7 @@ impl<'ctx> CodeGen<'ctx> {
                 }
                 let cc = self.builder.build_indirect_call(fn_type, fn_ptr, &ca, "indirect_untyped")
                     .map_err(llvm_err)?;
-                match cc.try_as_basic_value().left() {
+                match cc.try_as_basic_value().basic() {
                     Some(bv) => self.unpack_fat_return(bv, Some(BasicTypeEnum::StructType(ret_ty))),
                     None => Ok(TypedValue::Unit),
                 }
@@ -994,7 +994,7 @@ impl<'ctx> CodeGen<'ctx> {
     pub(super) fn builtin_list(&mut self, args: &[Expr]) -> Result<TypedValue<'ctx>, String> {
         let len = self.i64_ty().const_int(args.len() as u64, false);
         let cc = self.call_rt("atomic_list_create", &[len.into()])?;
-        let list_bv = cc.try_as_basic_value().left()
+        let list_bv = cc.try_as_basic_value().basic()
             .ok_or("list_create failed")?;
         let list_alloca = self.builder.build_alloca(self.list_type, "list_tmp").map_err(llvm_err)?;
         self.builder.build_store(list_alloca, list_bv).map_err(llvm_err)?;
@@ -1004,7 +1004,7 @@ impl<'ctx> CodeGen<'ctx> {
             let elem_fat = self.to_fat_struct(&v)?;
             let list_val = self.load_list(list_alloca)?;
             let cc = self.call_rt("atomic_list_push", &[list_val.into(), elem_fat.into()])?;
-            let new_list = cc.try_as_basic_value().left()
+            let new_list = cc.try_as_basic_value().basic()
                 .ok_or("list_push failed")?;
             self.builder.build_store(list_alloca, new_list).map_err(llvm_err)?;
         }
@@ -1402,7 +1402,7 @@ impl<'ctx> CodeGen<'ctx> {
 
         // Create result list
         let cc = self.call_rt("atomic_list_create", &[final_count.into()])?;
-        let list_bv = cc.try_as_basic_value().left().ok_or("list_create failed")?;
+        let list_bv = cc.try_as_basic_value().basic().ok_or("list_create failed")?;
         let result_alloca = self.builder.build_alloca(self.list_type, "ll_result").map_err(llvm_err)?;
         self.builder.build_store(result_alloca, list_bv).map_err(llvm_err)?;
 
@@ -1431,7 +1431,7 @@ impl<'ctx> CodeGen<'ctx> {
         // Map head
         self.builder.position_at_end(map_head_bb);
         let mapped_head = self.builder.build_indirect_call(map_fn_type, map_fn, &[head_val.into()], "mh_call").map_err(llvm_err)?;
-        let mapped_head_bv = mapped_head.try_as_basic_value().left().ok_or("map head call failed")?;
+        let mapped_head_bv = mapped_head.try_as_basic_value().basic().ok_or("map head call failed")?;
         let mapped_head_val = if mapped_head_bv.is_struct_value() {
             self.builder.build_extract_value(mapped_head_bv.into_struct_value(), 0, "mh_val").map_err(llvm_err)?.into_int_value()
         } else { mapped_head_bv.into_int_value() };
@@ -1451,7 +1451,7 @@ impl<'ctx> CodeGen<'ctx> {
         // ---- call_filt_head_bb: call filter on head ----
         self.builder.position_at_end(call_filt_head_bb);
         let filt_head_call = self.builder.build_indirect_call(filt_fn_type, filter_fn, &[candidate_head.into()], "fh_call").map_err(llvm_err)?;
-        let filt_head_bv = filt_head_call.try_as_basic_value().left().ok_or("filt head call failed")?;
+        let filt_head_bv = filt_head_call.try_as_basic_value().basic().ok_or("filt head call failed")?;
         let filt_head_tag = if filt_head_bv.is_struct_value() {
             self.builder.build_extract_value(filt_head_bv.into_struct_value(), 0, "fh_val").map_err(llvm_err)?.into_int_value()
         } else { filt_head_bv.into_int_value() };
@@ -1463,7 +1463,7 @@ impl<'ctx> CodeGen<'ctx> {
         let head_fat = self.make_int_fat(candidate_head)?;
         let cur_list_h = self.load_list(result_alloca)?;
         let cc_h = self.call_rt("atomic_list_push", &[cur_list_h.into(), head_fat.into()])?;
-        let new_list_h = cc_h.try_as_basic_value().left().ok_or("push head failed")?;
+        let new_list_h = cc_h.try_as_basic_value().basic().ok_or("push head failed")?;
         self.builder.build_store(result_alloca, new_list_h).map_err(llvm_err)?;
         let _ = self.builder.build_unconditional_branch(after_head_bb);
 
@@ -1507,7 +1507,7 @@ impl<'ctx> CodeGen<'ctx> {
         let current_state = self.builder.build_load(self.i64_ty(), state_phi_alloca, "ll_cur_state").map_err(llvm_err)?.into_int_value();
         let fn_type = self.fat_return_type.fn_type(&[self.i64_ty().into()], false);
         let call_result = self.builder.build_indirect_call(fn_type, step_fn, &[current_state.into()], "ll_step_call").map_err(llvm_err)?;
-        let step_fat = call_result.try_as_basic_value().left().ok_or("step call returned void")?;
+        let step_fat = call_result.try_as_basic_value().basic().ok_or("step call returned void")?;
         let step_fat_sv = step_fat.into_struct_value();
         let step_elem = self.builder.build_extract_value(step_fat_sv, 0, "ll_next").map_err(llvm_err)?.into_int_value();
         self.builder.build_store(state_phi_alloca, step_elem).map_err(llvm_err)?;
@@ -1534,7 +1534,7 @@ impl<'ctx> CodeGen<'ctx> {
 
         self.builder.position_at_end(map_elem_bb);
         let mapped_elem_call = self.builder.build_indirect_call(map_fn_type, map_fn, &[elem_val.into()], "me_call").map_err(llvm_err)?;
-        let mapped_elem_bv = mapped_elem_call.try_as_basic_value().left().ok_or("map elem call failed")?;
+        let mapped_elem_bv = mapped_elem_call.try_as_basic_value().basic().ok_or("map elem call failed")?;
         let mapped_elem_val = if mapped_elem_bv.is_struct_value() {
             self.builder.build_extract_value(mapped_elem_bv.into_struct_value(), 0, "me_val").map_err(llvm_err)?.into_int_value()
         } else { mapped_elem_bv.into_int_value() };
@@ -1557,7 +1557,7 @@ impl<'ctx> CodeGen<'ctx> {
         // ---- call_filt_elem_bb: call filter on element ----
         self.builder.position_at_end(call_filt_elem_bb);
         let filt_elem_call = self.builder.build_indirect_call(filt_fn_type, filter_fn, &[candidate_elem.into()], "fe_call").map_err(llvm_err)?;
-        let filt_elem_bv = filt_elem_call.try_as_basic_value().left().ok_or("filt elem call failed")?;
+        let filt_elem_bv = filt_elem_call.try_as_basic_value().basic().ok_or("filt elem call failed")?;
         let filt_elem_tag = if filt_elem_bv.is_struct_value() {
             self.builder.build_extract_value(filt_elem_bv.into_struct_value(), 0, "fe_val").map_err(llvm_err)?.into_int_value()
         } else { filt_elem_bv.into_int_value() };
@@ -1569,7 +1569,7 @@ impl<'ctx> CodeGen<'ctx> {
         let elem_fat = self.make_int_fat(candidate_elem)?;
         let cur_list2 = self.load_list(result_alloca)?;
         let cc2 = self.call_rt("atomic_list_push", &[cur_list2.into(), elem_fat.into()])?;
-        let new_list2 = cc2.try_as_basic_value().left().ok_or("push2 failed")?;
+        let new_list2 = cc2.try_as_basic_value().basic().ok_or("push2 failed")?;
         self.builder.build_store(result_alloca, new_list2).map_err(llvm_err)?;
         let new_i = self.builder.build_int_add(i_loaded, one, "ll_i_inc").map_err(llvm_err)?;
         self.builder.build_store(i_alloca, new_i).map_err(llvm_err)?;
@@ -1639,7 +1639,7 @@ impl<'ctx> CodeGen<'ctx> {
         // Create list and store in alloca
         let cap_val = self.i64_ty().const_int(16, false);
         let list_cc = self.call_rt("atomic_list_create", &[cap_val.into()])?;
-        let list_bv = list_cc.try_as_basic_value().left().ok_or("range_toList create fail")?;
+        let list_bv = list_cc.try_as_basic_value().basic().ok_or("range_toList create fail")?;
         let list_alloca = self.builder.build_alloca(self.list_type, "rtl_list").map_err(llvm_err)?;
         self.builder.build_store(list_alloca, list_bv).map_err(llvm_err)?;
 
@@ -1668,7 +1668,7 @@ impl<'ctx> CodeGen<'ctx> {
         let fat = self.make_int_fat(val_i)?;
         let cur_list = list_phi.as_basic_value();
         let pushed = self.call_rt("atomic_list_push", &[cur_list.into(), fat.into()])?;
-        let new_list = pushed.try_as_basic_value().left().ok_or("rtl push fail")?;
+        let new_list = pushed.try_as_basic_value().basic().ok_or("rtl push fail")?;
         let next_i = self.builder.build_int_add(val_i, self.i64_ty().const_int(1, false), "rtl_next").map_err(llvm_err)?;
         let body_end_block = self.builder.get_insert_block().unwrap();
         i_phi.add_incoming(&[(&next_i, body_end_block)]);
@@ -1868,7 +1868,7 @@ impl<'ctx> CodeGen<'ctx> {
         let cs = self.builder.build_load(self.i64_ty(), cur_state_alloca, "ld_cs_val").map_err(llvm_err)?.into_int_value();
         let fn_type = self.fat_return_type.fn_type(&[self.i64_ty().into()], false);
         let call_result = self.builder.build_indirect_call(fn_type, step_fn, &[cs.into()], "ld_step_call").map_err(llvm_err)?;
-        let step_fat = call_result.try_as_basic_value().left().ok_or("step call returned void")?;
+        let step_fat = call_result.try_as_basic_value().basic().ok_or("step call returned void")?;
         let step_fat_sv = step_fat.into_struct_value();
         let next_val = self.builder.build_extract_value(step_fat_sv, 0, "ld_next").map_err(llvm_err)?.into_int_value();
         self.builder.build_store(cur_state_alloca, next_val).map_err(llvm_err)?;
@@ -1980,12 +1980,12 @@ impl<'ctx> CodeGen<'ctx> {
         let w_new_fn = self.builder.build_extract_value(cap_load, 1, "w_new").map_err(llvm_err)?.into_pointer_value();
         let map_fn_type = fat_ty.fn_type(&[self.i64_ty().into()], false);
         let old_call = self.builder.build_indirect_call(map_fn_type, w_old_fn, &[w_state.into()], "w_old_call").map_err(llvm_err)?;
-        let old_result = old_call.try_as_basic_value().left().ok_or("old call failed")?;
+        let old_result = old_call.try_as_basic_value().basic().ok_or("old call failed")?;
         let old_val = if old_result.is_struct_value() {
             self.builder.build_extract_value(old_result.into_struct_value(), 0, "w_old_val").map_err(llvm_err)?.into_int_value()
         } else { old_result.into_int_value() };
         let new_call = self.builder.build_indirect_call(map_fn_type, w_new_fn, &[old_val.into()], "w_new_call").map_err(llvm_err)?;
-        let new_result = new_call.try_as_basic_value().left().ok_or("new call failed")?;
+        let new_result = new_call.try_as_basic_value().basic().ok_or("new call failed")?;
         self.builder.build_return(Some(&new_result)).map_err(llvm_err)?;
 
         self.builder.position_at_end(saved_block.unwrap());
@@ -2082,7 +2082,7 @@ impl<'ctx> CodeGen<'ctx> {
         // Call old_filter(state)
         let filt_fn_type = fat_ty.fn_type(&[self.i64_ty().into()], false);
         let old_call = self.builder.build_indirect_call(filt_fn_type, w_old_fn, &[w_state.into()], "w_old_call").map_err(llvm_err)?;
-        let old_result = old_call.try_as_basic_value().left().ok_or("old filt call failed")?;
+        let old_result = old_call.try_as_basic_value().basic().ok_or("old filt call failed")?;
         let old_val = if old_result.is_struct_value() {
             self.builder.build_extract_value(old_result.into_struct_value(), 0, "w_old_val").map_err(llvm_err)?.into_int_value()
         } else { old_result.into_int_value() };
@@ -2095,7 +2095,7 @@ impl<'ctx> CodeGen<'ctx> {
 
         self.builder.position_at_end(then_block);
         let new_call = self.builder.build_indirect_call(filt_fn_type, w_new_fn, &[w_state.into()], "w_new_call").map_err(llvm_err)?;
-        let new_result = new_call.try_as_basic_value().left().ok_or("new filt call failed")?;
+        let new_result = new_call.try_as_basic_value().basic().ok_or("new filt call failed")?;
         let new_val = if new_result.is_struct_value() {
             self.builder.build_extract_value(new_result.into_struct_value(), 0, "w_new_val").map_err(llvm_err)?.into_int_value()
         } else { new_result.into_int_value() };
@@ -2154,7 +2154,7 @@ impl<'ctx> CodeGen<'ctx> {
         let data = self.builder.build_extract_value(list, 0, "data").map_err(llvm_err)?.into_pointer_value();
 
         let cc = self.call_rt("atomic_list_create", &[len.into()])?;
-        let new_list = cc.try_as_basic_value().left().ok_or("list_create failed")?;
+        let new_list = cc.try_as_basic_value().basic().ok_or("list_create failed")?;
         let result_alloca = self.builder.build_alloca(self.list_type, "ltw_result").map_err(llvm_err)?;
         self.builder.build_store(result_alloca, new_list).map_err(llvm_err)?;
 
@@ -2183,7 +2183,7 @@ impl<'ctx> CodeGen<'ctx> {
         let fat_ty = self.string_type;
         let lam_fn_type = fat_ty.fn_type(&[i64.into()], false);
         let cc = self.builder.build_indirect_call(lam_fn_type, fn_ptr, &[tag.into()], "ltw_call").map_err(llvm_err)?;
-        let pred_bv = cc.try_as_basic_value().left().ok_or("ltw call failed")?;
+        let pred_bv = cc.try_as_basic_value().basic().ok_or("ltw call failed")?;
         let pred_tag = if pred_bv.is_struct_value() {
             self.builder.build_extract_value(pred_bv.into_struct_value(), 0, "pred").map_err(llvm_err)?.into_int_value()
         } else { pred_bv.into_int_value() };
@@ -2193,7 +2193,7 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(loop_ins);
         let cur = self.load_list(result_alloca)?;
         let pcc = self.call_rt("atomic_list_push", &[cur.into(), elem.into()])?;
-        let nl = pcc.try_as_basic_value().left().ok_or("list_push failed")?;
+        let nl = pcc.try_as_basic_value().basic().ok_or("list_push failed")?;
         self.builder.build_store(result_alloca, nl).map_err(llvm_err)?;
         let ni = self.builder.build_int_add(i, i64.const_int(1, false), "ltw_ni").map_err(llvm_err)?;
         self.builder.build_store(i_alloca, ni).map_err(llvm_err)?;
@@ -2292,7 +2292,7 @@ impl<'ctx> CodeGen<'ctx> {
         let min_len = self.builder.build_select(is_len1_lt_len2, len1, len2, "lz_min").map_err(llvm_err)?.into_int_value();
 
         let cc = self.call_rt("atomic_list_create", &[min_len.into()])?;
-        let new_list = cc.try_as_basic_value().left().ok_or("list_create failed")?;
+        let new_list = cc.try_as_basic_value().basic().ok_or("list_create failed")?;
         let result_alloca = self.builder.build_alloca(self.list_type, "lz_result").map_err(llvm_err)?;
         self.builder.build_store(result_alloca, new_list).map_err(llvm_err)?;
 
@@ -2321,11 +2321,11 @@ impl<'ctx> CodeGen<'ctx> {
         // Push both as separate elements (pair is two sequential entries)
         let cur = self.load_list(result_alloca)?;
         let cc = self.call_rt("atomic_list_push", &[cur.into(), e1.into()])?;
-        let nl = cc.try_as_basic_value().left().ok_or("list_push e1 failed")?;
+        let nl = cc.try_as_basic_value().basic().ok_or("list_push e1 failed")?;
         self.builder.build_store(result_alloca, nl).map_err(llvm_err)?;
         let cur2 = self.load_list(result_alloca)?;
         let cc2 = self.call_rt("atomic_list_push", &[cur2.into(), e2.into()])?;
-        let nl2 = cc2.try_as_basic_value().left().ok_or("list_push e2 failed")?;
+        let nl2 = cc2.try_as_basic_value().basic().ok_or("list_push e2 failed")?;
         self.builder.build_store(result_alloca, nl2).map_err(llvm_err)?;
 
         let ni = self.builder.build_int_add(i, i64.const_int(1, false), "lz_ni").map_err(llvm_err)?;
@@ -2367,7 +2367,7 @@ impl<'ctx> CodeGen<'ctx> {
         let task_size = self.builder.build_ptr_to_int(task_size_ptr, self.i64_ty(), "task_size").map_err(llvm_err)?;
         let malloc_fn = self.module.get_function("malloc").ok_or("malloc not found")?;
         let task_heap = self.builder.build_call(malloc_fn, &[task_size.into()], "task_heap")
-            .map_err(llvm_err)?.try_as_basic_value().left().unwrap().into_pointer_value();
+            .map_err(llvm_err)?.try_as_basic_value().unwrap_basic().into_pointer_value();
         let task_undef = self.task_type.get_undef();
         let pthread_zero = self.i64_ty().const_int(0, false);
         let done_zero = self.i64_ty().const_int(0, false);
@@ -2408,7 +2408,7 @@ impl<'ctx> CodeGen<'ctx> {
         // Create a fresh list INSIDE the thread (avoids cross-thread data issues)
         let cap = self.i64_ty().const_int(1, false);
         let cc = self.call_rt("atomic_list_create", &[cap.into()])?;
-        let list_bv = cc.try_as_basic_value().left().ok_or("list_create failed")?;
+        let list_bv = cc.try_as_basic_value().basic().ok_or("list_create failed")?;
         let rl_alloca = self.builder.build_alloca(self.list_type, "rl_a").map_err(llvm_err)?;
         self.builder.build_store(rl_alloca, list_bv).map_err(llvm_err)?;
         self.push_to_collector(rl_alloca, &result)?;
@@ -2459,7 +2459,7 @@ impl<'ctx> CodeGen<'ctx> {
             let task_fat = self.make_int_fat(task_as_i64)?;
             let cl = self.load_list(collector_alloca)?;
             let cc = self.call_rt("atomic_list_push", &[cl.into(), task_fat.into()])?;
-            let nl = cc.try_as_basic_value().left().ok_or("push failed")?;
+            let nl = cc.try_as_basic_value().basic().ok_or("push failed")?;
             self.builder.build_store(collector_alloca, nl).map_err(llvm_err)?;
         }
 
@@ -2477,7 +2477,7 @@ impl<'ctx> CodeGen<'ctx> {
         // Create collector list for task pointers
         let cap = self.i64_ty().const_int(4, false);
         let cc = self.call_rt("atomic_list_create", &[cap.into()])?;
-        let list_bv = cc.try_as_basic_value().left().ok_or("list_create failed")?;
+        let list_bv = cc.try_as_basic_value().basic().ok_or("list_create failed")?;
         let collector_alloca = self.builder.build_alloca(self.list_type, "coro_collector").map_err(llvm_err)?;
         self.builder.build_store(collector_alloca, list_bv).map_err(llvm_err)?;
 
@@ -2499,7 +2499,7 @@ impl<'ctx> CodeGen<'ctx> {
         // Create result list
         let result_cap = self.i64_ty().const_int(4, false);
         let rcc = self.call_rt("atomic_list_create", &[result_cap.into()])?;
-        let result_list_bv = rcc.try_as_basic_value().left().ok_or("result list_create failed")?;
+        let result_list_bv = rcc.try_as_basic_value().basic().ok_or("result list_create failed")?;
         let result_alloca = self.builder.build_alloca(self.list_type, "coro_results").map_err(llvm_err)?;
         self.builder.build_store(result_alloca, result_list_bv).map_err(llvm_err)?;
 
@@ -2550,7 +2550,7 @@ impl<'ctx> CodeGen<'ctx> {
         let rl_val = self.load_list(rl_alloca)?;
         let zero = self.i64_ty().const_int(0, false);
         let cc = self.call_rt("atomic_list_get", &[rl_val.into(), zero.into()])?;
-        let fat = cc.try_as_basic_value().left().ok_or("get failed")?.into_struct_value();
+        let fat = cc.try_as_basic_value().basic().ok_or("get failed")?.into_struct_value();
 
         // Fast-fail check: tag==1 && data_ptr!=null means Err variant
         let fat_tag = self.builder.build_extract_value(fat, 0, "ff_tag").map_err(llvm_err)?.into_int_value();
@@ -2565,7 +2565,7 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(add_ok_bb);
         let cur_results = self.load_list(result_alloca)?;
         let cc2 = self.call_rt("atomic_list_push", &[cur_results.into(), fat.into()])?;
-        let new_results = cc2.try_as_basic_value().left().ok_or("push2 failed")?;
+        let new_results = cc2.try_as_basic_value().basic().ok_or("push2 failed")?;
         self.builder.build_store(result_alloca, new_results).map_err(llvm_err)?;
         let next_i = self.builder.build_int_add(i_val, self.i64_ty().const_int(1, false), "cs_ni").map_err(llvm_err)?;
         self.builder.build_store(i_alloca, next_i).map_err(llvm_err)?;
@@ -2602,7 +2602,7 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(cancel_exit);
         let err_results = self.load_list(result_alloca)?;
         let ecc = self.call_rt("atomic_list_push", &[err_results.into(), fat.into()])?;
-        let enew = ecc.try_as_basic_value().left().ok_or("err push failed")?;
+        let enew = ecc.try_as_basic_value().basic().ok_or("err push failed")?;
         self.builder.build_store(result_alloca, enew).map_err(llvm_err)?;
         let _ = self.builder.build_unconditional_branch(loop_exit);
 
@@ -2635,7 +2635,7 @@ impl<'ctx> CodeGen<'ctx> {
         let elem_fat = self.to_fat_struct(value)?;
         let list_val = self.load_list(collector_alloca)?;
         let cc = self.call_rt("atomic_list_push", &[list_val.into(), elem_fat.into()])?;
-        let new_list = cc.try_as_basic_value().left().ok_or("list_push failed")?;
+        let new_list = cc.try_as_basic_value().basic().ok_or("list_push failed")?;
         self.builder.build_store(collector_alloca, new_list).map_err(llvm_err)?;
         Ok(())
     }
@@ -2665,7 +2665,7 @@ impl<'ctx> CodeGen<'ctx> {
         let task_size = self.builder.build_ptr_to_int(task_size_ptr, self.i64_ty(), "wtsz_i64").map_err(llvm_err)?;
         let malloc_fn = self.module.get_function("malloc").ok_or("malloc not found")?;
         let task_heap = self.builder.build_call(malloc_fn, &[task_size.into()], "wt_task")
-            .map_err(llvm_err)?.try_as_basic_value().left().unwrap().into_pointer_value();
+            .map_err(llvm_err)?.try_as_basic_value().unwrap_basic().into_pointer_value();
         // Initialize task struct with zeroes
         let task_undef = self.task_type.get_undef();
         let pthread_zero = self.i64_ty().const_int(0, false);
@@ -2706,7 +2706,7 @@ impl<'ctx> CodeGen<'ctx> {
         // Store result in the task's result_list
         let cap = self.i64_ty().const_int(1, false);
         let cc = self.call_rt("atomic_list_create", &[cap.into()])?;
-        let list_bv = cc.try_as_basic_value().left().ok_or("wt list_create failed")?;
+        let list_bv = cc.try_as_basic_value().basic().ok_or("wt list_create failed")?;
         let rl_alloca = self.builder.build_alloca(self.list_type, "wt_rl").map_err(llvm_err)?;
         self.builder.build_store(rl_alloca, list_bv).map_err(llvm_err)?;
         self.push_to_collector(rl_alloca, &result)?;
@@ -2833,7 +2833,7 @@ impl<'ctx> CodeGen<'ctx> {
         let rl_val = self.load_list(rla)?;
         let zero = self.i64_ty().const_int(0, false);
         let cc = self.call_rt("atomic_list_get", &[rl_val.into(), zero.into()])?;
-        let fat = cc.try_as_basic_value().left().ok_or("wt get failed")?.into_struct_value();
+        let fat = cc.try_as_basic_value().basic().ok_or("wt get failed")?.into_struct_value();
 
         // Free task heap
         let free_fn = self.module.get_function("free").ok_or("free not found")?;
@@ -2854,7 +2854,7 @@ impl<'ctx> CodeGen<'ctx> {
         let ok_val_i64 = self.builder.build_extract_value(fat_loaded, 0, "wt_ovi").map_err(llvm_err)?.into_int_value();
         let ok_val_ptr = self.builder.build_extract_value(fat_loaded, 1, "wt_ovp").map_err(llvm_err)?.into_pointer_value();
         // Allocate heap copy of the fat struct data
-        let heap_copy = self.builder.build_call(malloc_fn, &[self.i64_ty().const_int(16, false).into()], "wt_hc").map_err(llvm_err)?.try_as_basic_value().left().unwrap().into_pointer_value();
+        let heap_copy = self.builder.build_call(malloc_fn, &[self.i64_ty().const_int(16, false).into()], "wt_hc").map_err(llvm_err)?.try_as_basic_value().unwrap_basic().into_pointer_value();
         let _ = self.builder.build_store(heap_copy, ok_val_i64).map_err(llvm_err)?;
         let data_ptr = unsafe { self.builder.build_gep(self.i64_ty(), heap_copy, &[self.i64_ty().const_int(1, false)], "wt_dp").map_err(llvm_err) }?;
         let _ = self.builder.build_store(data_ptr, ok_val_ptr).map_err(llvm_err)?;
@@ -2875,7 +2875,7 @@ impl<'ctx> CodeGen<'ctx> {
         let stream_size = self.builder.build_ptr_to_int(size_ptr, self.i64_ty(), "stream_size").map_err(llvm_err)?;
         let malloc_fn = self.module.get_function("malloc").ok_or("malloc not found")?;
         let stream_buf = self.builder.build_call(malloc_fn, &[stream_size.into()], "stream_buf")
-            .map_err(llvm_err)?.try_as_basic_value().left().unwrap().into_pointer_value();
+            .map_err(llvm_err)?.try_as_basic_value().unwrap_basic().into_pointer_value();
         let stream_ptr = self.builder.build_pointer_cast(stream_buf, self.context.ptr_type(Default::default()), "stream_ptr").map_err(llvm_err)?;
 
         // Initialize mutex (field 0)
@@ -2895,7 +2895,7 @@ impl<'ctx> CodeGen<'ctx> {
         // Initialize list (field 3)
         let cap = self.i64_ty().const_int(4, false);
         let cc = self.call_rt("atomic_list_create", &[cap.into()])?;
-        let list_bv = cc.try_as_basic_value().left().ok_or("stream list_create failed")?;
+        let list_bv = cc.try_as_basic_value().basic().ok_or("stream list_create failed")?;
         let list_field_ptr = self.builder.build_struct_gep(stream_ty, stream_ptr, 3, "list_field").map_err(llvm_err)?;
         self.builder.build_store(list_field_ptr, list_bv).map_err(llvm_err)?;
 
@@ -2979,7 +2979,7 @@ impl<'ctx> CodeGen<'ctx> {
                 // Re-load list_val in this block (can't use value from wait_loop across cond_wait)
                 let lv2 = self.load_list(list_ptr)?;
                 let fat = self.call_rt("atomic_list_get", &[lv2.into(), zero.into()])?;
-                let fat = fat.try_as_basic_value().left().ok_or("receive get failed")?.into_struct_value();
+                let fat = fat.try_as_basic_value().basic().ok_or("receive get failed")?.into_struct_value();
                 let tag = self.builder.build_extract_value(fat, 0, "tag").map_err(llvm_err)?.into_int_value();
                 let data_ptr = self.builder.build_extract_value(lv2, 0, "data").map_err(llvm_err)?.into_pointer_value();
                 let len2 = self.builder.build_extract_value(lv2, 1, "len").map_err(llvm_err)?.into_int_value();
@@ -3077,7 +3077,7 @@ impl<'ctx> CodeGen<'ctx> {
                 let list_val = self.load_list(list_alloca)?;
                 let zero = self.i64_ty().const_int(0, false);
                 let cc = self.call_rt("atomic_list_get", &[list_val.into(), zero.into()])?;
-                let fat = cc.try_as_basic_value().left().ok_or("wait get failed")?.into_struct_value();
+                let fat = cc.try_as_basic_value().basic().ok_or("wait get failed")?.into_struct_value();
                 let tag = self.builder.build_extract_value(fat, 0, "tag").map_err(llvm_err)?.into_int_value();
                 Ok(TypedValue::Int(tag))
             }
@@ -3118,7 +3118,7 @@ impl<'ctx> CodeGen<'ctx> {
 
         // Create new list with same capacity
         let new_list_cc = self.call_rt("atomic_list_create", &[input_len.into()])?;
-        let new_list_bv = new_list_cc.try_as_basic_value().left().ok_or("list_create failed")?;
+        let new_list_bv = new_list_cc.try_as_basic_value().basic().ok_or("list_create failed")?;
         let result_alloca = self.builder.build_alloca(self.list_type, "map_result").map_err(llvm_err)?;
         self.builder.build_store(result_alloca, new_list_bv).map_err(llvm_err)?;
 
@@ -3149,7 +3149,7 @@ impl<'ctx> CodeGen<'ctx> {
         // Get element from input list (fat {i64,ptr} struct)
         let input_list = self.load_list(list_ptr)?;
         let elem = self.call_rt("atomic_list_get", &[input_list.into(), i_val.into()])?;
-        let elem_val = elem.try_as_basic_value().left().ok_or("list_get failed")?;
+        let elem_val = elem.try_as_basic_value().basic().ok_or("list_get failed")?;
         // Extract tag (first field) to pass to lambda (lambdas still take i64)
         let elem_tag = self.builder.build_extract_value(elem_val.into_struct_value(), 0, "elem_tag")
             .map_err(llvm_err)?;
@@ -3159,12 +3159,12 @@ impl<'ctx> CodeGen<'ctx> {
         let fn_type = fat_ret_ty.fn_type(&[i64.into()], false);
         let call_result = self.builder.build_indirect_call(fn_type, fn_ptr, &[elem_tag.into()], "map_call")
             .map_err(llvm_err)?;
-        let mapped_bv = call_result.try_as_basic_value().left().ok_or("map call failed")?;
+        let mapped_bv = call_result.try_as_basic_value().basic().ok_or("map call failed")?;
 
         // Push lambda result (fat {i64,ptr}) to result list
         let result_list = self.load_list(result_alloca)?;
         let push_cc = self.call_rt("atomic_list_push", &[result_list.into(), mapped_bv.into()])?;
-        let pushed = push_cc.try_as_basic_value().left().ok_or("list_push failed")?;
+        let pushed = push_cc.try_as_basic_value().basic().ok_or("list_push failed")?;
         self.builder.build_store(result_alloca, pushed).map_err(llvm_err)?;
 
         // Increment counter
@@ -3206,7 +3206,7 @@ impl<'ctx> CodeGen<'ctx> {
         let input_len = self.list_len_val(list_struct)?;
 
         let new_list_cc = self.call_rt("atomic_list_create", &[input_len.into()])?;
-        let new_list_bv = new_list_cc.try_as_basic_value().left().ok_or("list_create failed")?;
+        let new_list_bv = new_list_cc.try_as_basic_value().basic().ok_or("list_create failed")?;
         let result_alloca = self.builder.build_alloca(self.list_type, "filter_result").map_err(llvm_err)?;
         self.builder.build_store(result_alloca, new_list_bv).map_err(llvm_err)?;
 
@@ -3238,7 +3238,7 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(loop_body);
         let input_list = self.load_list(list_ptr)?;
         let elem = self.call_rt("atomic_list_get", &[input_list.into(), i_val.into()])?;
-        let elem_val = elem.try_as_basic_value().left().ok_or("list_get failed")?;
+        let elem_val = elem.try_as_basic_value().basic().ok_or("list_get failed")?;
         // Extract tag to pass to predicate (lambdas still take i64)
         let elem_tag = self.builder.build_extract_value(elem_val.into_struct_value(), 0, "elem_tag")
             .map_err(llvm_err)?;
@@ -3247,7 +3247,7 @@ impl<'ctx> CodeGen<'ctx> {
         let fn_type = fat_ret_ty.fn_type(&[i64.into()], false);
         let call_result = self.builder.build_indirect_call(fn_type, fn_ptr, &[elem_tag.into()], "filter_call")
             .map_err(llvm_err)?;
-        let pred_bv = call_result.try_as_basic_value().left().ok_or("filter call failed")?;
+        let pred_bv = call_result.try_as_basic_value().basic().ok_or("filter call failed")?;
         let pred = if pred_bv.is_struct_value() {
             self.builder.build_extract_value(pred_bv.into_struct_value(), 0, "filter_val")
                 .map_err(llvm_err)?.into_int_value()
@@ -3262,7 +3262,7 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(loop_push);
         let result_list = self.load_list(result_alloca)?;
         let push_cc = self.call_rt("atomic_list_push", &[result_list.into(), elem_val.into()])?;
-        let pushed = push_cc.try_as_basic_value().left().ok_or("list_push failed")?;
+        let pushed = push_cc.try_as_basic_value().basic().ok_or("list_push failed")?;
         self.builder.build_store(result_alloca, pushed).map_err(llvm_err)?;
         let _ = self.builder.build_unconditional_branch(loop_inc);
 
@@ -3340,7 +3340,7 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(loop_body);
         let input_list = self.load_list(list_ptr)?;
         let elem = self.call_rt("atomic_list_get", &[input_list.into(), i_val.into()])?;
-        let elem_val = elem.try_as_basic_value().left().ok_or("list_get failed")?;
+        let elem_val = elem.try_as_basic_value().basic().ok_or("list_get failed")?;
         // Extract tag to pass to fold lambda
         let elem_tag = self.builder.build_extract_value(elem_val.into_struct_value(), 0, "elem_tag")
             .map_err(llvm_err)?;
@@ -3350,7 +3350,7 @@ impl<'ctx> CodeGen<'ctx> {
         let fn_type = fat_ret_ty.fn_type(&[i64.into(), i64.into()], false);
         let call_result = self.builder.build_indirect_call(fn_type, fn_ptr, &[acc.into(), elem_tag.into()], "fold_call")
             .map_err(llvm_err)?;
-        let new_acc_bv = call_result.try_as_basic_value().left().ok_or("fold call failed")?;
+        let new_acc_bv = call_result.try_as_basic_value().basic().ok_or("fold call failed")?;
         let new_acc = if new_acc_bv.is_struct_value() {
             self.builder.build_extract_value(new_acc_bv.into_struct_value(), 0, "fold_val")
                 .map_err(llvm_err)?.into_int_value()
@@ -3376,7 +3376,7 @@ impl<'ctx> CodeGen<'ctx> {
             TypedValue::List(lp) => {
                 let lv = self.load_list(lp)?;
                 let cc = self.call_rt("atomic_list_flatten", &[lv.into()])?;
-                let result = cc.try_as_basic_value().left().ok_or("flatten failed")?;
+                let result = cc.try_as_basic_value().basic().ok_or("flatten failed")?;
                 let alloca = self.builder.build_alloca(self.list_type, "flat_map").map_err(llvm_err)?;
                 self.builder.build_store(alloca, result).map_err(llvm_err)?;
                 Ok(TypedValue::List(alloca))
@@ -3423,12 +3423,12 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(bdy);
         let input_list = self.load_list(list_ptr)?;
         let elem = self.call_rt("atomic_list_get", &[input_list.into(), iv.into()])?;
-        let elem_val = elem.try_as_basic_value().left().ok_or("list_get failed")?;
+        let elem_val = elem.try_as_basic_value().basic().ok_or("list_get failed")?;
         let elem_tag = self.builder.build_extract_value(elem_val.into_struct_value(), 0, "et").map_err(llvm_err)?.into_int_value();
         let fat_ret_ty = self.string_type;
         let fn_type = fat_ret_ty.fn_type(&[i64.into()], false);
         let call_r = self.builder.build_indirect_call(fn_type, fn_ptr, &[elem_tag.into()], "any_call").map_err(llvm_err)?;
-        let pred_bv = call_r.try_as_basic_value().left().ok_or("call failed")?;
+        let pred_bv = call_r.try_as_basic_value().basic().ok_or("call failed")?;
         let pred = if pred_bv.is_struct_value() {
             self.builder.build_extract_value(pred_bv.into_struct_value(), 0, "pred").map_err(llvm_err)?.into_int_value()
         } else { pred_bv.into_int_value() };
@@ -3466,12 +3466,12 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(bdy);
         let input_list = self.load_list(list_ptr)?;
         let elem = self.call_rt("atomic_list_get", &[input_list.into(), iv.into()])?;
-        let elem_val = elem.try_as_basic_value().left().ok_or("list_get failed")?;
+        let elem_val = elem.try_as_basic_value().basic().ok_or("list_get failed")?;
         let elem_tag = self.builder.build_extract_value(elem_val.into_struct_value(), 0, "et").map_err(llvm_err)?.into_int_value();
         let fat_ret_ty = self.string_type;
         let fn_type = fat_ret_ty.fn_type(&[i64.into()], false);
         let call_r = self.builder.build_indirect_call(fn_type, fn_ptr, &[elem_tag.into()], "all_call").map_err(llvm_err)?;
-        let pred_bv = call_r.try_as_basic_value().left().ok_or("call failed")?;
+        let pred_bv = call_r.try_as_basic_value().basic().ok_or("call failed")?;
         let pred = if pred_bv.is_struct_value() {
             self.builder.build_extract_value(pred_bv.into_struct_value(), 0, "pred").map_err(llvm_err)?.into_int_value()
         } else { pred_bv.into_int_value() };
@@ -3512,12 +3512,12 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(bdy);
         let input_list = self.load_list(list_ptr)?;
         let elem = self.call_rt("atomic_list_get", &[input_list.into(), iv.into()])?;
-        let elem_val = elem.try_as_basic_value().left().ok_or("list_get failed")?;
+        let elem_val = elem.try_as_basic_value().basic().ok_or("list_get failed")?;
         let elem_tag = self.builder.build_extract_value(elem_val.into_struct_value(), 0, "et").map_err(llvm_err)?.into_int_value();
         let fat_ret_ty = self.string_type;
         let fn_type = fat_ret_ty.fn_type(&[i64.into()], false);
         let call_r = self.builder.build_indirect_call(fn_type, fn_ptr, &[elem_tag.into()], "find_call").map_err(llvm_err)?;
-        let pred_bv = call_r.try_as_basic_value().left().ok_or("call failed")?;
+        let pred_bv = call_r.try_as_basic_value().basic().ok_or("call failed")?;
         let pred = if pred_bv.is_struct_value() {
             self.builder.build_extract_value(pred_bv.into_struct_value(), 0, "pred").map_err(llvm_err)?.into_int_value()
         } else { pred_bv.into_int_value() };
@@ -3555,12 +3555,12 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(bdy);
         let input_list = self.load_list(list_ptr)?;
         let elem = self.call_rt("atomic_list_get", &[input_list.into(), iv.into()])?;
-        let elem_val = elem.try_as_basic_value().left().ok_or("list_get failed")?;
+        let elem_val = elem.try_as_basic_value().basic().ok_or("list_get failed")?;
         let elem_tag = self.builder.build_extract_value(elem_val.into_struct_value(), 0, "et").map_err(llvm_err)?.into_int_value();
         let fat_ret_ty = self.string_type;
         let fn_type = fat_ret_ty.fn_type(&[i64.into()], false);
         let call_r = self.builder.build_indirect_call(fn_type, fn_ptr, &[elem_tag.into()], "fi_call").map_err(llvm_err)?;
-        let pred_bv = call_r.try_as_basic_value().left().ok_or("call failed")?;
+        let pred_bv = call_r.try_as_basic_value().basic().ok_or("call failed")?;
         let pred = if pred_bv.is_struct_value() {
             self.builder.build_extract_value(pred_bv.into_struct_value(), 0, "pred").map_err(llvm_err)?.into_int_value()
         } else { pred_bv.into_int_value() };
@@ -3604,7 +3604,7 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(init_bb);
         let input_list0 = self.load_list(list_ptr)?;
         let first = self.call_rt("atomic_list_get", &[input_list0.into(), zero.into()])?;
-        let first_val = first.try_as_basic_value().left().ok_or("list_get failed")?;
+        let first_val = first.try_as_basic_value().basic().ok_or("list_get failed")?;
         self.builder.build_store(acc_a, first_val).map_err(llvm_err)?;
         let _ = self.builder.build_unconditional_branch(loop_hdr);
         // Loop
@@ -3615,14 +3615,14 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(loop_bdy);
         let input_list = self.load_list(list_ptr)?;
         let elem = self.call_rt("atomic_list_get", &[input_list.into(), iv.into()])?;
-        let elem_val = elem.try_as_basic_value().left().ok_or("list_get failed")?;
+        let elem_val = elem.try_as_basic_value().basic().ok_or("list_get failed")?;
         let elem_tag = self.builder.build_extract_value(elem_val.into_struct_value(), 0, "et").map_err(llvm_err)?.into_int_value();
         let acc_fat = self.builder.build_load(self.string_type, acc_a, "acc").map_err(llvm_err)?;
         let acc_tag = self.builder.build_extract_value(acc_fat.into_struct_value(), 0, "acc_tag").map_err(llvm_err)?.into_int_value();
         let fat_ret_ty = self.string_type;
         let fn_type = fat_ret_ty.fn_type(&[i64.into(), i64.into()], false);
         let call_r = self.builder.build_indirect_call(fn_type, fn_ptr, &[acc_tag.into(), elem_tag.into()], "reduce_call").map_err(llvm_err)?;
-        let new_acc = call_r.try_as_basic_value().left().ok_or("call failed")?;
+        let new_acc = call_r.try_as_basic_value().basic().ok_or("call failed")?;
         self.builder.build_store(acc_a, new_acc).map_err(llvm_err)?;
         let ni = self.builder.build_int_add(iv, one, "ni").map_err(llvm_err)?;
         self.builder.build_store(i_a, ni).map_err(llvm_err)?;
@@ -3672,13 +3672,13 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(bdy);
         let input_list = self.load_list(list_ptr)?;
         let elem = self.call_rt("atomic_list_get", &[input_list.into(), iv.into()])?;
-        let elem_val = elem.try_as_basic_value().left().ok_or("list_get failed")?;
+        let elem_val = elem.try_as_basic_value().basic().ok_or("list_get failed")?;
         let elem_tag = self.builder.build_extract_value(elem_val.into_struct_value(), 0, "et").map_err(llvm_err)?.into_int_value();
         let acc = self.builder.build_load(i64, acc_a, "acc").map_err(llvm_err)?.into_int_value();
         let fat_ret_ty = self.string_type;
         let fn_type = fat_ret_ty.fn_type(&[i64.into(), i64.into()], false);
         let call_r = self.builder.build_indirect_call(fn_type, fn_ptr, &[elem_tag.into(), acc.into()], "fr_call").map_err(llvm_err)?;
-        let new_acc_bv = call_r.try_as_basic_value().left().ok_or("call failed")?;
+        let new_acc_bv = call_r.try_as_basic_value().basic().ok_or("call failed")?;
         let new_acc = if new_acc_bv.is_struct_value() {
             self.builder.build_extract_value(new_acc_bv.into_struct_value(), 0, "fr_val").map_err(llvm_err)?.into_int_value()
         } else { new_acc_bv.into_int_value() };
@@ -3700,7 +3700,7 @@ impl<'ctx> CodeGen<'ctx> {
         let i64 = self.i64_ty();
         // Create result list
         let cc = self.call_rt("atomic_list_create", &[input_len.into()])?;
-        let res_bv = cc.try_as_basic_value().left().ok_or("list_create failed")?;
+        let res_bv = cc.try_as_basic_value().basic().ok_or("list_create failed")?;
         let res_a = self.builder.build_alloca(self.list_type, "tw_res").map_err(llvm_err)?;
         self.builder.build_store(res_a, res_bv).map_err(llvm_err)?;
         let i_a = self.builder.build_alloca(i64, "i").map_err(llvm_err)?;
@@ -3716,12 +3716,12 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(bdy);
         let input_list = self.load_list(list_ptr)?;
         let elem = self.call_rt("atomic_list_get", &[input_list.into(), iv.into()])?;
-        let elem_val = elem.try_as_basic_value().left().ok_or("list_get failed")?;
+        let elem_val = elem.try_as_basic_value().basic().ok_or("list_get failed")?;
         let elem_tag = self.builder.build_extract_value(elem_val.into_struct_value(), 0, "et").map_err(llvm_err)?.into_int_value();
         let fat_ret_ty = self.string_type;
         let fn_type = fat_ret_ty.fn_type(&[i64.into()], false);
         let call_r = self.builder.build_indirect_call(fn_type, fn_ptr, &[elem_tag.into()], "tw_call").map_err(llvm_err)?;
-        let pred_bv = call_r.try_as_basic_value().left().ok_or("call failed")?;
+        let pred_bv = call_r.try_as_basic_value().basic().ok_or("call failed")?;
         let pred = if pred_bv.is_struct_value() {
             self.builder.build_extract_value(pred_bv.into_struct_value(), 0, "pred").map_err(llvm_err)?.into_int_value()
         } else { pred_bv.into_int_value() };
@@ -3731,7 +3731,7 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(push_bb);
         let rl = self.builder.build_load(self.list_type, res_a, "rl").map_err(llvm_err)?.into_struct_value();
         let rp = self.call_rt("atomic_list_push", &[rl.into(), elem_val.into()])?;
-        self.builder.build_store(res_a, rp.try_as_basic_value().left().unwrap()).map_err(llvm_err)?;
+        self.builder.build_store(res_a, rp.try_as_basic_value().unwrap_basic()).map_err(llvm_err)?;
         let ni = self.builder.build_int_add(iv, i64.const_int(1, false), "ni").map_err(llvm_err)?;
         self.builder.build_store(i_a, ni).map_err(llvm_err)?;
         let _ = self.builder.build_unconditional_branch(hdr);
@@ -3747,7 +3747,7 @@ impl<'ctx> CodeGen<'ctx> {
         let current_fn = self.builder.get_insert_block().and_then(|b| b.get_parent()).ok_or("no function")?;
         let i64 = self.i64_ty();
         let cc = self.call_rt("atomic_list_create", &[input_len.into()])?;
-        let res_bv = cc.try_as_basic_value().left().ok_or("list_create failed")?;
+        let res_bv = cc.try_as_basic_value().basic().ok_or("list_create failed")?;
         let res_a = self.builder.build_alloca(self.list_type, "dw_res").map_err(llvm_err)?;
         self.builder.build_store(res_a, res_bv).map_err(llvm_err)?;
         let dropping_a = self.builder.build_alloca(self.bool_ty(), "dropping").map_err(llvm_err)?;
@@ -3765,7 +3765,7 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(bdy);
         let input_list = self.load_list(list_ptr)?;
         let elem = self.call_rt("atomic_list_get", &[input_list.into(), iv.into()])?;
-        let elem_val = elem.try_as_basic_value().left().ok_or("list_get failed")?;
+        let elem_val = elem.try_as_basic_value().basic().ok_or("list_get failed")?;
         let elem_tag = self.builder.build_extract_value(elem_val.into_struct_value(), 0, "et").map_err(llvm_err)?.into_int_value();
         let dropping = self.builder.build_load(self.bool_ty(), dropping_a, "dropping").map_err(llvm_err)?.into_int_value();
         let is_dropping = self.builder.build_int_compare(IntPredicate::NE, dropping, self.bool_ty().const_zero(), "is_dropping").map_err(llvm_err)?;
@@ -3779,7 +3779,7 @@ impl<'ctx> CodeGen<'ctx> {
         let fat_ret_ty = self.string_type;
         let fn_type = fat_ret_ty.fn_type(&[i64.into()], false);
         let call_r = self.builder.build_indirect_call(fn_type, fn_ptr, &[elem_tag.into()], "dw_call").map_err(llvm_err)?;
-        let pred_bv = call_r.try_as_basic_value().left().ok_or("call failed")?;
+        let pred_bv = call_r.try_as_basic_value().basic().ok_or("call failed")?;
         let pred = if pred_bv.is_struct_value() {
             self.builder.build_extract_value(pred_bv.into_struct_value(), 0, "pred").map_err(llvm_err)?.into_int_value()
         } else { pred_bv.into_int_value() };
@@ -3791,7 +3791,7 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.build_store(dropping_a, self.bool_ty().const_zero()).map_err(llvm_err)?;
         let rl = self.builder.build_load(self.list_type, res_a, "rl").map_err(llvm_err)?.into_struct_value();
         let rp = self.call_rt("atomic_list_push", &[rl.into(), elem_val.into()])?;
-        self.builder.build_store(res_a, rp.try_as_basic_value().left().unwrap()).map_err(llvm_err)?;
+        self.builder.build_store(res_a, rp.try_as_basic_value().unwrap_basic()).map_err(llvm_err)?;
         let _ = self.builder.build_unconditional_branch(inc_bb);
         // Increment
         self.builder.position_at_end(inc_bb);
@@ -3815,7 +3815,7 @@ impl<'ctx> CodeGen<'ctx> {
         let one = i64.const_int(1, false);
         // Create result list (copy of input)
         let cc = self.call_rt("atomic_list_create", &[input_len.into()])?;
-        let res_bv = cc.try_as_basic_value().left().ok_or("list_create failed")?;
+        let res_bv = cc.try_as_basic_value().basic().ok_or("list_create failed")?;
         let res_a = self.builder.build_alloca(self.list_type, "sb_res").map_err(llvm_err)?;
         self.builder.build_store(res_a, res_bv).map_err(llvm_err)?;
         // Copy all elements to result
@@ -3832,10 +3832,10 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(copy_bdy);
         let input_list = self.load_list(list_ptr)?;
         let elem = self.call_rt("atomic_list_get", &[input_list.into(), ic.into()])?;
-        let elem_val = elem.try_as_basic_value().left().ok_or("list_get failed")?;
+        let elem_val = elem.try_as_basic_value().basic().ok_or("list_get failed")?;
         let rl = self.builder.build_load(self.list_type, res_a, "rl").map_err(llvm_err)?.into_struct_value();
         let rp = self.call_rt("atomic_list_push", &[rl.into(), elem_val.into()])?;
-        self.builder.build_store(res_a, rp.try_as_basic_value().left().unwrap()).map_err(llvm_err)?;
+        self.builder.build_store(res_a, rp.try_as_basic_value().unwrap_basic()).map_err(llvm_err)?;
         let nic = self.builder.build_int_add(ic, one, "nic").map_err(llvm_err)?;
         self.builder.build_store(i_copy_a, nic).map_err(llvm_err)?;
         let _ = self.builder.build_unconditional_branch(copy_hdr);
@@ -3866,17 +3866,17 @@ impl<'ctx> CodeGen<'ctx> {
         let jm1 = self.builder.build_int_sub(jv, one, "jm1").map_err(llvm_err)?;
         let res_list_jm1 = self.load_list(res_a)?;
         let elem_jm1 = self.call_rt("atomic_list_get", &[res_list_jm1.into(), jm1.into()])?;
-        let ev_jm1 = elem_jm1.try_as_basic_value().left().ok_or("list_get failed")?;
+        let ev_jm1 = elem_jm1.try_as_basic_value().basic().ok_or("list_get failed")?;
         let tag_jm1 = self.builder.build_extract_value(ev_jm1.into_struct_value(), 0, "t_jm1").map_err(llvm_err)?.into_int_value();
         let res_list_j = self.load_list(res_a)?;
         let elem_j = self.call_rt("atomic_list_get", &[res_list_j.into(), jv.into()])?;
-        let ev_j = elem_j.try_as_basic_value().left().ok_or("list_get failed")?;
+        let ev_j = elem_j.try_as_basic_value().basic().ok_or("list_get failed")?;
         let tag_j = self.builder.build_extract_value(ev_j.into_struct_value(), 0, "t_j").map_err(llvm_err)?.into_int_value();
         // Call comparator: fn(a, b) -> Bool, returns true if a > b (need swap)
         let fat_ret_ty = self.string_type;
         let fn_type = fat_ret_ty.fn_type(&[i64.into(), i64.into()], false);
         let call_r = self.builder.build_indirect_call(fn_type, fn_ptr, &[tag_jm1.into(), tag_j.into()], "sb_cmp").map_err(llvm_err)?;
-        let cmp_bv = call_r.try_as_basic_value().left().ok_or("cmp failed")?;
+        let cmp_bv = call_r.try_as_basic_value().basic().ok_or("cmp failed")?;
         let cmp = if cmp_bv.is_struct_value() {
             self.builder.build_extract_value(cmp_bv.into_struct_value(), 0, "cmp").map_err(llvm_err)?.into_int_value()
         } else { cmp_bv.into_int_value() };
@@ -3890,7 +3890,7 @@ impl<'ctx> CodeGen<'ctx> {
         let _set1 = self.call_rt("atomic_list_set", &[rl_sw.into(), jm1.into(), ev_j.into()])?;
         let rl2_sw = self.load_list(res_a)?;
         let set2 = self.call_rt("atomic_list_set", &[rl2_sw.into(), jv.into(), ev_jm1.into()])?;
-        let set_bv = set2.try_as_basic_value().left().ok_or("list_set failed")?;
+        let set_bv = set2.try_as_basic_value().basic().ok_or("list_set failed")?;
         self.builder.build_store(res_a, set_bv).map_err(llvm_err)?;
         self.builder.build_store(j_a, jm1).map_err(llvm_err)?;
         let _ = self.builder.build_unconditional_branch(inner_hdr);
@@ -3915,11 +3915,11 @@ impl<'ctx> CodeGen<'ctx> {
         // Create two result lists
         let cap = i64.const_int(4, false);
         let left_cc = self.call_rt("atomic_list_create", &[cap.into()])?;
-        let left_bv = left_cc.try_as_basic_value().left().ok_or("list_create left")?;
+        let left_bv = left_cc.try_as_basic_value().basic().ok_or("list_create left")?;
         let left_a = self.builder.build_alloca(self.list_type, "part_left").map_err(llvm_err)?;
         self.builder.build_store(left_a, left_bv).map_err(llvm_err)?;
         let right_cc = self.call_rt("atomic_list_create", &[cap.into()])?;
-        let right_bv = right_cc.try_as_basic_value().left().ok_or("list_create right")?;
+        let right_bv = right_cc.try_as_basic_value().basic().ok_or("list_create right")?;
         let right_a = self.builder.build_alloca(self.list_type, "part_right").map_err(llvm_err)?;
         self.builder.build_store(right_a, right_bv).map_err(llvm_err)?;
         let hdr = self.context.append_basic_block(current_fn, "part_hdr");
@@ -3933,12 +3933,12 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(bdy);
         let input_list = self.load_list(list_ptr)?;
         let elem = self.call_rt("atomic_list_get", &[input_list.into(), iv.into()])?;
-        let elem_val = elem.try_as_basic_value().left().ok_or("list_get failed")?;
+        let elem_val = elem.try_as_basic_value().basic().ok_or("list_get failed")?;
         let elem_tag = self.builder.build_extract_value(elem_val.into_struct_value(), 0, "et").map_err(llvm_err)?.into_int_value();
         let fat_ret_ty = self.string_type;
         let fn_type = fat_ret_ty.fn_type(&[i64.into()], false);
         let call_r = self.builder.build_indirect_call(fn_type, fn_ptr, &[elem_tag.into()], "part_call").map_err(llvm_err)?;
-        let pred_bv = call_r.try_as_basic_value().left().ok_or("call failed")?;
+        let pred_bv = call_r.try_as_basic_value().basic().ok_or("call failed")?;
         let pred = if pred_bv.is_struct_value() {
             self.builder.build_extract_value(pred_bv.into_struct_value(), 0, "pred").map_err(llvm_err)?.into_int_value()
         } else { pred_bv.into_int_value() };
@@ -3951,14 +3951,14 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(left_bb);
         let ll = self.load_list(left_a)?;
         let lp = self.call_rt("atomic_list_push", &[ll.into(), elem_val.into()])?;
-        let lp_bv = lp.try_as_basic_value().left().ok_or("push left")?;
+        let lp_bv = lp.try_as_basic_value().basic().ok_or("push left")?;
         self.builder.build_store(left_a, lp_bv).map_err(llvm_err)?;
         let _ = self.builder.build_unconditional_branch(part_merge);
         // Push to right
         self.builder.position_at_end(right_bb);
         let rl = self.load_list(right_a)?;
         let rp = self.call_rt("atomic_list_push", &[rl.into(), elem_val.into()])?;
-        let rp_bv = rp.try_as_basic_value().left().ok_or("push right")?;
+        let rp_bv = rp.try_as_basic_value().basic().ok_or("push right")?;
         self.builder.build_store(right_a, rp_bv).map_err(llvm_err)?;
         let _ = self.builder.build_unconditional_branch(part_merge);
         self.builder.position_at_end(part_merge);
@@ -3999,12 +3999,12 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(bdy);
         let input_list = self.load_list(list_ptr)?;
         let elem = self.call_rt("atomic_list_get", &[input_list.into(), iv.into()])?;
-        let elem_val = elem.try_as_basic_value().left().ok_or("list_get failed")?;
+        let elem_val = elem.try_as_basic_value().basic().ok_or("list_get failed")?;
         let elem_tag = self.builder.build_extract_value(elem_val.into_struct_value(), 0, "et").map_err(llvm_err)?.into_int_value();
         let fat_ret_ty = self.string_type;
         let fn_type = fat_ret_ty.fn_type(&[i64.into()], false);
         let call_r = self.builder.build_indirect_call(fn_type, fn_ptr, &[elem_tag.into()], "cnt_call").map_err(llvm_err)?;
-        let pred_bv = call_r.try_as_basic_value().left().ok_or("call failed")?;
+        let pred_bv = call_r.try_as_basic_value().basic().ok_or("call failed")?;
         let pred = if pred_bv.is_struct_value() {
             self.builder.build_extract_value(pred_bv.into_struct_value(), 0, "pred").map_err(llvm_err)?.into_int_value()
         } else { pred_bv.into_int_value() };
@@ -4137,7 +4137,7 @@ impl<'ctx> CodeGen<'ctx> {
 
         // Create new empty map (use input_len as capacity)
         let cc = self.call_rt("atomic_list_create", &[input_len.into()])?;
-        let new_map_bv = cc.try_as_basic_value().left().ok_or("list_create failed")?;
+        let new_map_bv = cc.try_as_basic_value().basic().ok_or("list_create failed")?;
         let result_alloca = self.builder.build_alloca(self.list_type, "mf_result").map_err(llvm_err)?;
         self.builder.build_store(result_alloca, new_map_bv).map_err(llvm_err)?;
 
@@ -4178,7 +4178,7 @@ impl<'ctx> CodeGen<'ctx> {
         let fat_ret_ty = self.string_type;
         let fn_type = fat_ret_ty.fn_type(&[i64.into(), i64.into()], false);
         let call_result = self.builder.build_indirect_call(fn_type, fn_ptr, &[kt.into(), vt.into()], "mf_call").map_err(llvm_err)?;
-        let pred_bv = call_result.try_as_basic_value().left().ok_or("mf call failed")?;
+        let pred_bv = call_result.try_as_basic_value().basic().ok_or("mf call failed")?;
         let pred_tag = if pred_bv.is_struct_value() {
             self.builder.build_extract_value(pred_bv.into_struct_value(), 0, "pred").map_err(llvm_err)?.into_int_value()
         } else { pred_bv.into_int_value() };
@@ -4198,7 +4198,7 @@ impl<'ctx> CodeGen<'ctx> {
 
         let cur_map = self.builder.build_load(self.list_type, result_alloca, "cur_map").map_err(llvm_err)?.into_struct_value();
         let ins_cc = self.call_rt("atomic_map_insert", &[cur_map.into(), key_fat.as_basic_value_enum().into(), val_fat.as_basic_value_enum().into()])?;
-        let new_map = ins_cc.try_as_basic_value().left().ok_or("map_insert failed")?;
+        let new_map = ins_cc.try_as_basic_value().basic().ok_or("map_insert failed")?;
         self.builder.build_store(result_alloca, new_map).map_err(llvm_err)?;
         let _ = self.builder.build_unconditional_branch(loop_next);
 
@@ -4259,7 +4259,7 @@ impl<'ctx> CodeGen<'ctx> {
         // Create new empty map for transformed values
         let cap = self.builder.build_int_add(input_len, i64.const_int(4, false), "mmv_cap").map_err(llvm_err)?;
         let cc = self.call_rt("atomic_list_create", &[cap.into()])?;
-        let new_map_bv = cc.try_as_basic_value().left().ok_or("list_create failed")?;
+        let new_map_bv = cc.try_as_basic_value().basic().ok_or("list_create failed")?;
         let result_alloca = self.builder.build_alloca(self.list_type, "mmv_result").map_err(llvm_err)?;
         self.builder.build_store(result_alloca, new_map_bv).map_err(llvm_err)?;
 
@@ -4297,7 +4297,7 @@ impl<'ctx> CodeGen<'ctx> {
         let fat_ret_ty = self.string_type;
         let fn_type = fat_ret_ty.fn_type(&[i64.into()], false);
         let call_result = self.builder.build_indirect_call(fn_type, fn_ptr, &[vt.into()], "mmv_call").map_err(llvm_err)?;
-        let new_val_bv = call_result.try_as_basic_value().left().ok_or("mmv call failed")?;
+        let new_val_bv = call_result.try_as_basic_value().basic().ok_or("mmv call failed")?;
         let new_val = new_val_bv.into_struct_value();
         let new_vt = self.builder.build_extract_value(new_val, 0, "new_vt").map_err(llvm_err)?.into_int_value();
         let new_vp = self.builder.build_extract_value(new_val, 1, "new_vp").map_err(llvm_err)?.into_pointer_value();
@@ -4315,7 +4315,7 @@ impl<'ctx> CodeGen<'ctx> {
 
         let cur_map = self.builder.build_load(self.list_type, result_alloca, "cur_map").map_err(llvm_err)?.into_struct_value();
         let ins_cc = self.call_rt("atomic_map_insert", &[cur_map.into(), key_fat.as_basic_value_enum().into(), val_fat.as_basic_value_enum().into()])?;
-        let new_map = ins_cc.try_as_basic_value().left().ok_or("map_insert failed")?;
+        let new_map = ins_cc.try_as_basic_value().basic().ok_or("map_insert failed")?;
         self.builder.build_store(result_alloca, new_map).map_err(llvm_err)?;
 
         let ni = self.builder.build_int_add(i_val, i64.const_int(1, false), "ni").map_err(llvm_err)?;
@@ -4422,7 +4422,7 @@ impl<'ctx> CodeGen<'ctx> {
         let fat_ret_ty = self.string_type;
         let fn_type = fat_ret_ty.fn_type(&[i64.into(), i64.into(), i64.into()], false);
         let call_result = self.builder.build_indirect_call(fn_type, fn_ptr, &[acc.into(), kt.into(), vt.into()], "mfld_call").map_err(llvm_err)?;
-        let new_acc_bv = call_result.try_as_basic_value().left().ok_or("mfld call failed")?;
+        let new_acc_bv = call_result.try_as_basic_value().basic().ok_or("mfld call failed")?;
         let new_acc = if new_acc_bv.is_struct_value() {
             self.builder.build_extract_value(new_acc_bv.into_struct_value(), 0, "mfld_val").map_err(llvm_err)?.into_int_value()
         } else {
@@ -4674,7 +4674,7 @@ impl<'ctx> CodeGen<'ctx> {
         // Call the callback with its actual function type (not i64->i64!)
         let cc = self.builder.build_indirect_call(fn_type, fn_ptr, &[inner_val.into()], "fm_call")
             .map_err(llvm_err)?;
-        match cc.try_as_basic_value().left() {
+        match cc.try_as_basic_value().basic() {
             Some(bv) => {
                 self.builder.build_store(result_alloca, bv).map_err(llvm_err)?;
             }
@@ -4769,7 +4769,7 @@ impl<'ctx> CodeGen<'ctx> {
         // Call the callback with the inner value
         let cc = self.builder.build_indirect_call(fn_type, fn_ptr, &[inner_val.into()], "em_call")
             .map_err(llvm_err)?;
-        let cb_result = cc.try_as_basic_value().left().ok_or("em call failed")?;
+        let cb_result = cc.try_as_basic_value().basic().ok_or("em call failed")?;
 
         // Wrap the callback result in Some/Ok (tag = 0) on the heap
         let buf = self.malloc_rc(i64.const_int(8, false))?;
@@ -4883,7 +4883,7 @@ impl<'ctx> CodeGen<'ctx> {
                 let elem_fat = self.to_fat_struct(&elem_val)?;
                 let list = self.load_list(list_ptr)?;
                 let cc = self.call_rt("atomic_list_push", &[list.into(), elem_fat.into()])?;
-                let new_list = cc.try_as_basic_value().left().ok_or("list_push failed")?;
+                let new_list = cc.try_as_basic_value().basic().ok_or("list_push failed")?;
                 let alloca = self.builder.build_alloca(self.list_type, "appended").map_err(llvm_err)?;
                 self.builder.build_store(alloca, new_list).map_err(llvm_err)?;
                 Ok(TypedValue::List(alloca))
@@ -4899,7 +4899,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let s1 = self.load_string(*p1)?;
                         let s2 = self.load_string(*p2)?;
                         let cc = self.call_rt("atomic_string_concat", &[s1.into(), s2.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("string_concat failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("string_concat failed")?;
                         let alloca = self.builder.build_alloca(self.string_type, "concat_str").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::Str(alloca))
@@ -4916,7 +4916,7 @@ impl<'ctx> CodeGen<'ctx> {
                     TypedValue::Str(p) => {
                         let s = self.load_string(p)?;
                         let cc = self.call_rt("atomic_string_to_upper", &[s.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("to_upper failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("to_upper failed")?;
                         let alloca = self.builder.build_alloca(self.string_type, "upper").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::Str(alloca))
@@ -4933,7 +4933,7 @@ impl<'ctx> CodeGen<'ctx> {
                     TypedValue::Str(p) => {
                         let s = self.load_string(p)?;
                         let cc = self.call_rt("atomic_string_to_lower", &[s.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("to_lower failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("to_lower failed")?;
                         let alloca = self.builder.build_alloca(self.string_type, "lower").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::Str(alloca))
@@ -4950,7 +4950,7 @@ impl<'ctx> CodeGen<'ctx> {
                     TypedValue::Str(p) => {
                         let s = self.load_string(p)?;
                         let cc = self.call_rt("atomic_string_trim", &[s.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("trim failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("trim failed")?;
                         let alloca = self.builder.build_alloca(self.string_type, "trimmed").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::Str(alloca))
@@ -4963,7 +4963,7 @@ impl<'ctx> CodeGen<'ctx> {
                     return Err("read_line expects no arguments".to_string());
                 }
                 let cc = self.call_rt("atomic_read_line", &[])?;
-                let result_struct = cc.try_as_basic_value().left().ok_or("read_line failed")?.into_struct_value();
+                let result_struct = cc.try_as_basic_value().basic().ok_or("read_line failed")?.into_struct_value();
                 // Extract string {i64, ptr} and success flag i1
                 let str_len = self.builder.build_extract_value(result_struct, 0, "slen").map_err(llvm_err)?.into_int_value();
                 let str_ptr = self.builder.build_extract_value(result_struct, 1, "sptr").map_err(llvm_err)?.into_pointer_value();
@@ -4989,7 +4989,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let sv = self.load_string(*sp)?;
                         let pv = self.load_string(*pp)?;
                         let cc = self.call_rt("atomic_string_starts_with", &[sv.into(), pv.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("starts_with failed")?.into_int_value();
+                        let result = cc.try_as_basic_value().basic().ok_or("starts_with failed")?.into_int_value();
                         Ok(TypedValue::Bool(result))
                     }
                     _ => Err("starts_with: arguments must be strings".to_string()),
@@ -5006,7 +5006,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let sv = self.load_string(*sp)?;
                         let suv = self.load_string(*sup)?;
                         let cc = self.call_rt("atomic_string_ends_with", &[sv.into(), suv.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("ends_with failed")?.into_int_value();
+                        let result = cc.try_as_basic_value().basic().ok_or("ends_with failed")?.into_int_value();
                         Ok(TypedValue::Bool(result))
                     }
                     _ => Err("ends_with: arguments must be strings".to_string()),
@@ -5026,7 +5026,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let len_bv = len.to_bv().ok_or("len must be a basic value")?;
                         let cc = self.call_rt("atomic_string_substring",
                             &[sv.into(), start_bv.into(), len_bv.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("substring failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("substring failed")?;
                         let alloca = self.builder.build_alloca(self.string_type, "substr").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::Str(alloca))
@@ -5043,7 +5043,7 @@ impl<'ctx> CodeGen<'ctx> {
                     TypedValue::Str(sp) => {
                         let sv = self.load_string(sp)?;
                         let cc = self.call_rt("atomic_parse_int", &[sv.into()])?;
-                        let result_struct = cc.try_as_basic_value().left().ok_or("parse_int failed")?.into_struct_value();
+                        let result_struct = cc.try_as_basic_value().basic().ok_or("parse_int failed")?.into_struct_value();
                         let val = self.builder.build_extract_value(result_struct, 0, "val").map_err(llvm_err)?.into_int_value();
                         let ok = self.builder.build_extract_value(result_struct, 1, "ok").map_err(llvm_err)?.into_int_value();
                         self.build_option_int(val, ok)
@@ -5060,7 +5060,7 @@ impl<'ctx> CodeGen<'ctx> {
                     TypedValue::Str(pp) => {
                         let pv = self.load_string(pp)?;
                         let cc = self.call_rt("atomic_read_file", &[pv.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("read_file failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("read_file failed")?;
                         let alloca = self.builder.build_alloca(self.string_type, "content").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::Str(alloca))
@@ -5079,7 +5079,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let pv = self.load_string(*pp)?;
                         let cv = self.load_string(*cp)?;
                         let cc = self.call_rt("atomic_write_file", &[pv.into(), cv.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("write_file failed")?.into_int_value();
+                        let result = cc.try_as_basic_value().basic().ok_or("write_file failed")?.into_int_value();
                         Ok(TypedValue::Bool(result))
                     }
                     _ => Err("write_file: arguments must be strings".to_string()),
@@ -5096,7 +5096,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let pv = self.load_string(*pp)?;
                         let cv = self.load_string(*cp)?;
                         let cc = self.call_rt("atomic_file_append", &[pv.into(), cv.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("append_file failed")?.into_int_value();
+                        let result = cc.try_as_basic_value().basic().ok_or("append_file failed")?.into_int_value();
                         Ok(TypedValue::Bool(result))
                     }
                     _ => Err("append_file: arguments must be strings".to_string()),
@@ -5111,7 +5111,7 @@ impl<'ctx> CodeGen<'ctx> {
                     TypedValue::Str(pp) => {
                         let pv = self.load_string(pp)?;
                         let cc = self.call_rt("atomic_file_exists", &[pv.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("exists failed")?.into_int_value();
+                        let result = cc.try_as_basic_value().basic().ok_or("exists failed")?.into_int_value();
                         Ok(TypedValue::Bool(result))
                     }
                     _ => Err("exists: argument must be a string".to_string()),
@@ -5126,7 +5126,7 @@ impl<'ctx> CodeGen<'ctx> {
                     TypedValue::Str(pp) => {
                         let pv = self.load_string(pp)?;
                         let cc = self.call_rt("atomic_file_delete", &[pv.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("delete_file failed")?.into_int_value();
+                        let result = cc.try_as_basic_value().basic().ok_or("delete_file failed")?.into_int_value();
                         Ok(TypedValue::Bool(result))
                     }
                     _ => Err("delete_file: argument must be a string".to_string()),
@@ -5144,7 +5144,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let path_s = self.load_string(*pp)?;
                         let mode_s = self.load_string(*mp)?;
                         let cc = self.call_rt("atomic_file_open", &[path_s.into(), mode_s.into()])?;
-                        let file_ptr = cc.try_as_basic_value().left().ok_or("open_file failed")?.into_pointer_value();
+                        let file_ptr = cc.try_as_basic_value().basic().ok_or("open_file failed")?.into_pointer_value();
                         Ok(TypedValue::FileHandle(file_ptr))
                     }
                     _ => Err("open_file: arguments must be strings (path, mode)".to_string()),
@@ -5158,7 +5158,7 @@ impl<'ctx> CodeGen<'ctx> {
                 match file {
                     TypedValue::FileHandle(p) => {
                         let cc = self.call_rt("atomic_file_close", &[p.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("close_file failed")?.into_int_value();
+                        let result = cc.try_as_basic_value().basic().ok_or("close_file failed")?.into_int_value();
                         let ok = self.builder.build_int_compare(
                             IntPredicate::EQ, result, self.i32_ty().const_int(0, false), "ok"
                         ).map_err(llvm_err)?;
@@ -5175,7 +5175,7 @@ impl<'ctx> CodeGen<'ctx> {
                 match file {
                     TypedValue::FileHandle(p) => {
                         let cc = self.call_rt("atomic_file_eof", &[p.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("is_eof failed")?.into_int_value();
+                        let result = cc.try_as_basic_value().basic().ok_or("is_eof failed")?.into_int_value();
                         Ok(TypedValue::Bool(result))
                     }
                     _ => Err("is_eof: argument must be a FileHandle".to_string()),
@@ -5189,12 +5189,12 @@ impl<'ctx> CodeGen<'ctx> {
                 match file {
                     TypedValue::FileHandle(p) => {
                         let cc = self.call_rt("atomic_file_read_line", &[p.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("file_read_line failed")?.into_struct_value();
+                        let result = cc.try_as_basic_value().basic().ok_or("file_read_line failed")?.into_struct_value();
                         // Build string from len+ptr
                         let len = self.builder.build_extract_value(result, 0, "len").map_err(llvm_err)?.into_int_value();
                         let data = self.builder.build_extract_value(result, 1, "data").map_err(llvm_err)?.into_pointer_value();
                         let str_struct = self.call_rt("atomic_string_create", &[data.into(), len.into()])?;
-                        let str_val = str_struct.try_as_basic_value().left().ok_or("string_create failed")?;
+                        let str_val = str_struct.try_as_basic_value().basic().ok_or("string_create failed")?;
                         let str_alloca = self.builder.build_alloca(self.string_type, "str_tmp").map_err(llvm_err)?;
                         self.builder.build_store(str_alloca, str_val).map_err(llvm_err)?;
                         Ok(TypedValue::Str(str_alloca))
@@ -5211,11 +5211,11 @@ impl<'ctx> CodeGen<'ctx> {
                 match (&file, &size) {
                     (TypedValue::FileHandle(p), TypedValue::Int(s)) => {
                         let cc = self.call_rt("atomic_file_read_bytes", &[(*p).into(), (*s).into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("file_read_bytes failed")?.into_struct_value();
+                        let result = cc.try_as_basic_value().basic().ok_or("file_read_bytes failed")?.into_struct_value();
                         let len = self.builder.build_extract_value(result, 0, "len").map_err(llvm_err)?.into_int_value();
                         let data = self.builder.build_extract_value(result, 1, "data").map_err(llvm_err)?.into_pointer_value();
                         let str_struct = self.call_rt("atomic_string_create", &[data.into(), len.into()])?;
-                        let str_val = str_struct.try_as_basic_value().left().ok_or("string_create failed")?;
+                        let str_val = str_struct.try_as_basic_value().basic().ok_or("string_create failed")?;
                         let str_alloca = self.builder.build_alloca(self.string_type, "rb_tmp").map_err(llvm_err)?;
                         self.builder.build_store(str_alloca, str_val).map_err(llvm_err)?;
                         Ok(TypedValue::Str(str_alloca))
@@ -5235,7 +5235,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let data_len = self.builder.build_extract_value(data_s, 0, "dlen").map_err(llvm_err)?.into_int_value();
                         let data_ptr = self.builder.build_extract_value(data_s, 1, "dptr").map_err(llvm_err)?.into_pointer_value();
                         let cc = self.call_rt("atomic_file_write_bytes", &[(*fp).into(), data_ptr.into(), data_len.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("file_write failed")?.into_int_value();
+                        let result = cc.try_as_basic_value().basic().ok_or("file_write failed")?.into_int_value();
                         Ok(TypedValue::Bool(result))
                     }
                     _ => Err("file_write: arguments must be (FileHandle, String)".to_string()),
@@ -5259,10 +5259,10 @@ impl<'ctx> CodeGen<'ctx> {
                         let nl_len = self.i64_ty().const_int(1, false);
                         let nl_buf = self.builder.build_call(malloc_fn,
                             &[self.i64_ty().const_int(2, false).into()], "nl_buf"
-                        ).map_err(llvm_err)?.try_as_basic_value().left().unwrap().into_pointer_value();
+                        ).map_err(llvm_err)?.try_as_basic_value().unwrap_basic().into_pointer_value();
                         self.builder.build_store(nl_buf, self.context.i8_type().const_int(10, false)).map_err(llvm_err)?;
                         let _ = self.call_rt("atomic_file_write_bytes", &[(*fp).into(), nl_buf.into(), nl_len.into()])?;
-                        let result = cc1.try_as_basic_value().left().ok_or("file_write_line failed")?.into_int_value();
+                        let result = cc1.try_as_basic_value().basic().ok_or("file_write_line failed")?.into_int_value();
                         Ok(TypedValue::Bool(result))
                     }
                     _ => Err("file_write_line: arguments must be (FileHandle, String)".to_string()),
@@ -5276,7 +5276,7 @@ impl<'ctx> CodeGen<'ctx> {
                 match file {
                     TypedValue::FileHandle(p) => {
                         let cc = self.call_rt("atomic_file_flush", &[p.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("file_flush failed")?.into_int_value();
+                        let result = cc.try_as_basic_value().basic().ok_or("file_flush failed")?.into_int_value();
                         Ok(TypedValue::Bool(result))
                     }
                     _ => Err("file_flush: argument must be a FileHandle".to_string()),
@@ -5293,7 +5293,7 @@ impl<'ctx> CodeGen<'ctx> {
                     (TypedValue::FileHandle(p), TypedValue::Int(o), TypedValue::Int(w)) => {
                         let w32 = self.builder.build_int_truncate(*w, self.i32_ty(), "w32").map_err(llvm_err)?;
                         let cc = self.call_rt("atomic_file_seek", &[(*p).into(), (*o).into(), w32.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("file_seek failed")?.into_int_value();
+                        let result = cc.try_as_basic_value().basic().ok_or("file_seek failed")?.into_int_value();
                         Ok(TypedValue::Bool(result))
                     }
                     _ => Err("file_seek: arguments must be (FileHandle, Int, Int)".to_string()),
@@ -5307,7 +5307,7 @@ impl<'ctx> CodeGen<'ctx> {
                 match file {
                     TypedValue::FileHandle(p) => {
                         let cc = self.call_rt("atomic_file_tell", &[p.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("file_tell failed")?.into_int_value();
+                        let result = cc.try_as_basic_value().basic().ok_or("file_tell failed")?.into_int_value();
                         Ok(TypedValue::Int(result))
                     }
                     _ => Err("file_tell: argument must be a FileHandle".to_string()),
@@ -5322,7 +5322,7 @@ impl<'ctx> CodeGen<'ctx> {
                 let min_bv = min.to_bv().ok_or("min must be a basic value")?;
                 let max_bv = max.to_bv().ok_or("max must be a basic value")?;
                 let cc = self.call_rt("atomic_rand_int", &[min_bv.into(), max_bv.into()])?;
-                let result = cc.try_as_basic_value().left().ok_or("rand_int failed")?.into_int_value();
+                let result = cc.try_as_basic_value().basic().ok_or("rand_int failed")?.into_int_value();
                 Ok(TypedValue::Int(result))
             }
             "rand_float" => {
@@ -5330,7 +5330,7 @@ impl<'ctx> CodeGen<'ctx> {
                     return Err("rand_float expects no arguments".to_string());
                 }
                 let cc = self.call_rt("atomic_rand_float", &[])?;
-                let result = cc.try_as_basic_value().left().ok_or("rand_float failed")?.into_float_value();
+                let result = cc.try_as_basic_value().basic().ok_or("rand_float failed")?.into_float_value();
                 Ok(TypedValue::Float(result))
             }
             "split" => {
@@ -5344,7 +5344,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let sv = self.load_string(*sp)?;
                         let dv = self.load_string(*dp)?;
                         let cc = self.call_rt("atomic_string_split", &[sv.into(), dv.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("split failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("split failed")?;
                         let alloca = self.builder.build_alloca(self.list_type, "split_result").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::List(alloca))
@@ -5363,7 +5363,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let lv = self.load_list(*lp)?;
                         let dv = self.load_string(*dp)?;
                         let cc = self.call_rt("atomic_string_join", &[lv.into(), dv.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("join failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("join failed")?;
                         let alloca = self.builder.build_alloca(self.string_type, "join_result").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::Str(alloca))
@@ -5384,7 +5384,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let fv = self.load_string(*fp)?;
                         let tv = self.load_string(*tp)?;
                         let cc = self.call_rt("atomic_string_replace", &[sv.into(), fv.into(), tv.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("replace failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("replace failed")?;
                         let alloca = self.builder.build_alloca(self.string_type, "replace_result").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::Str(alloca))
@@ -5460,7 +5460,7 @@ impl<'ctx> CodeGen<'ctx> {
                 let v = self.compile_expr(&args[0])?;
                 let fv = self.typed_to_float(&v)?;
                 let sqrt_fn = self.module.get_function("sqrt").unwrap();
-                let r = self.builder.build_call(sqrt_fn, &[fv.into()], "sqrt").map_err(llvm_err)?.try_as_basic_value().left().ok_or("sqrt failed")?.into_float_value();
+                let r = self.builder.build_call(sqrt_fn, &[fv.into()], "sqrt").map_err(llvm_err)?.try_as_basic_value().basic().ok_or("sqrt failed")?.into_float_value();
                 Ok(TypedValue::Float(r))
             }
             "cbrt" => {
@@ -5468,7 +5468,7 @@ impl<'ctx> CodeGen<'ctx> {
                 let v = self.compile_expr(&args[0])?;
                 let fv = self.typed_to_float(&v)?;
                 let cbrt_fn = self.module.get_function("cbrt").unwrap();
-                let r = self.builder.build_call(cbrt_fn, &[fv.into()], "cbrt").map_err(llvm_err)?.try_as_basic_value().left().ok_or("cbrt failed")?.into_float_value();
+                let r = self.builder.build_call(cbrt_fn, &[fv.into()], "cbrt").map_err(llvm_err)?.try_as_basic_value().basic().ok_or("cbrt failed")?.into_float_value();
                 Ok(TypedValue::Float(r))
             }
             "sin" => {
@@ -5476,7 +5476,7 @@ impl<'ctx> CodeGen<'ctx> {
                 let v = self.compile_expr(&args[0])?;
                 let fv = self.typed_to_float(&v)?;
                 let f = self.module.get_function("sin").unwrap();
-                let r = self.builder.build_call(f, &[fv.into()], "sin").map_err(llvm_err)?.try_as_basic_value().left().ok_or("sin failed")?.into_float_value();
+                let r = self.builder.build_call(f, &[fv.into()], "sin").map_err(llvm_err)?.try_as_basic_value().basic().ok_or("sin failed")?.into_float_value();
                 Ok(TypedValue::Float(r))
             }
             "cos" => {
@@ -5484,7 +5484,7 @@ impl<'ctx> CodeGen<'ctx> {
                 let v = self.compile_expr(&args[0])?;
                 let fv = self.typed_to_float(&v)?;
                 let f = self.module.get_function("cos").unwrap();
-                let r = self.builder.build_call(f, &[fv.into()], "cos").map_err(llvm_err)?.try_as_basic_value().left().ok_or("cos failed")?.into_float_value();
+                let r = self.builder.build_call(f, &[fv.into()], "cos").map_err(llvm_err)?.try_as_basic_value().basic().ok_or("cos failed")?.into_float_value();
                 Ok(TypedValue::Float(r))
             }
             "tan" => {
@@ -5492,7 +5492,7 @@ impl<'ctx> CodeGen<'ctx> {
                 let v = self.compile_expr(&args[0])?;
                 let fv = self.typed_to_float(&v)?;
                 let f = self.module.get_function("tan").unwrap();
-                let r = self.builder.build_call(f, &[fv.into()], "tan").map_err(llvm_err)?.try_as_basic_value().left().ok_or("tan failed")?.into_float_value();
+                let r = self.builder.build_call(f, &[fv.into()], "tan").map_err(llvm_err)?.try_as_basic_value().basic().ok_or("tan failed")?.into_float_value();
                 Ok(TypedValue::Float(r))
             }
             "asin" => {
@@ -5500,7 +5500,7 @@ impl<'ctx> CodeGen<'ctx> {
                 let v = self.compile_expr(&args[0])?;
                 let fv = self.typed_to_float(&v)?;
                 let f = self.module.get_function("asin").unwrap();
-                let r = self.builder.build_call(f, &[fv.into()], "asin").map_err(llvm_err)?.try_as_basic_value().left().ok_or("asin failed")?.into_float_value();
+                let r = self.builder.build_call(f, &[fv.into()], "asin").map_err(llvm_err)?.try_as_basic_value().basic().ok_or("asin failed")?.into_float_value();
                 Ok(TypedValue::Float(r))
             }
             "acos" => {
@@ -5508,7 +5508,7 @@ impl<'ctx> CodeGen<'ctx> {
                 let v = self.compile_expr(&args[0])?;
                 let fv = self.typed_to_float(&v)?;
                 let f = self.module.get_function("acos").unwrap();
-                let r = self.builder.build_call(f, &[fv.into()], "acos").map_err(llvm_err)?.try_as_basic_value().left().ok_or("acos failed")?.into_float_value();
+                let r = self.builder.build_call(f, &[fv.into()], "acos").map_err(llvm_err)?.try_as_basic_value().basic().ok_or("acos failed")?.into_float_value();
                 Ok(TypedValue::Float(r))
             }
             "atan" => {
@@ -5516,7 +5516,7 @@ impl<'ctx> CodeGen<'ctx> {
                 let v = self.compile_expr(&args[0])?;
                 let fv = self.typed_to_float(&v)?;
                 let f = self.module.get_function("atan").unwrap();
-                let r = self.builder.build_call(f, &[fv.into()], "atan").map_err(llvm_err)?.try_as_basic_value().left().ok_or("atan failed")?.into_float_value();
+                let r = self.builder.build_call(f, &[fv.into()], "atan").map_err(llvm_err)?.try_as_basic_value().basic().ok_or("atan failed")?.into_float_value();
                 Ok(TypedValue::Float(r))
             }
             "atan2" => {
@@ -5526,7 +5526,7 @@ impl<'ctx> CodeGen<'ctx> {
                 let yv = self.typed_to_float(&y)?;
                 let xv = self.typed_to_float(&x)?;
                 let f = self.module.get_function("atan2").unwrap();
-                let r = self.builder.build_call(f, &[yv.into(), xv.into()], "atan2").map_err(llvm_err)?.try_as_basic_value().left().ok_or("atan2 failed")?.into_float_value();
+                let r = self.builder.build_call(f, &[yv.into(), xv.into()], "atan2").map_err(llvm_err)?.try_as_basic_value().basic().ok_or("atan2 failed")?.into_float_value();
                 Ok(TypedValue::Float(r))
             }
             "log" => {
@@ -5534,7 +5534,7 @@ impl<'ctx> CodeGen<'ctx> {
                 let v = self.compile_expr(&args[0])?;
                 let fv = self.typed_to_float(&v)?;
                 let f = self.module.get_function("log").unwrap();
-                let r = self.builder.build_call(f, &[fv.into()], "log").map_err(llvm_err)?.try_as_basic_value().left().ok_or("log failed")?.into_float_value();
+                let r = self.builder.build_call(f, &[fv.into()], "log").map_err(llvm_err)?.try_as_basic_value().basic().ok_or("log failed")?.into_float_value();
                 Ok(TypedValue::Float(r))
             }
             "log2" => {
@@ -5542,7 +5542,7 @@ impl<'ctx> CodeGen<'ctx> {
                 let v = self.compile_expr(&args[0])?;
                 let fv = self.typed_to_float(&v)?;
                 let f = self.module.get_function("log2").unwrap();
-                let r = self.builder.build_call(f, &[fv.into()], "log2").map_err(llvm_err)?.try_as_basic_value().left().ok_or("log2 failed")?.into_float_value();
+                let r = self.builder.build_call(f, &[fv.into()], "log2").map_err(llvm_err)?.try_as_basic_value().basic().ok_or("log2 failed")?.into_float_value();
                 Ok(TypedValue::Float(r))
             }
             "log10" => {
@@ -5550,7 +5550,7 @@ impl<'ctx> CodeGen<'ctx> {
                 let v = self.compile_expr(&args[0])?;
                 let fv = self.typed_to_float(&v)?;
                 let f = self.module.get_function("log10").unwrap();
-                let r = self.builder.build_call(f, &[fv.into()], "log10").map_err(llvm_err)?.try_as_basic_value().left().ok_or("log10 failed")?.into_float_value();
+                let r = self.builder.build_call(f, &[fv.into()], "log10").map_err(llvm_err)?.try_as_basic_value().basic().ok_or("log10 failed")?.into_float_value();
                 Ok(TypedValue::Float(r))
             }
             "exp" => {
@@ -5558,7 +5558,7 @@ impl<'ctx> CodeGen<'ctx> {
                 let v = self.compile_expr(&args[0])?;
                 let fv = self.typed_to_float(&v)?;
                 let f = self.module.get_function("exp").unwrap();
-                let r = self.builder.build_call(f, &[fv.into()], "exp").map_err(llvm_err)?.try_as_basic_value().left().ok_or("exp failed")?.into_float_value();
+                let r = self.builder.build_call(f, &[fv.into()], "exp").map_err(llvm_err)?.try_as_basic_value().basic().ok_or("exp failed")?.into_float_value();
                 Ok(TypedValue::Float(r))
             }
             "floor" => {
@@ -5566,7 +5566,7 @@ impl<'ctx> CodeGen<'ctx> {
                 let v = self.compile_expr(&args[0])?;
                 let fv = self.typed_to_float(&v)?;
                 let f = self.module.get_function("floor").unwrap();
-                let r = self.builder.build_call(f, &[fv.into()], "floor").map_err(llvm_err)?.try_as_basic_value().left().ok_or("floor failed")?.into_float_value();
+                let r = self.builder.build_call(f, &[fv.into()], "floor").map_err(llvm_err)?.try_as_basic_value().basic().ok_or("floor failed")?.into_float_value();
                 Ok(TypedValue::Float(r))
             }
             "ceil" => {
@@ -5574,7 +5574,7 @@ impl<'ctx> CodeGen<'ctx> {
                 let v = self.compile_expr(&args[0])?;
                 let fv = self.typed_to_float(&v)?;
                 let f = self.module.get_function("ceil").unwrap();
-                let r = self.builder.build_call(f, &[fv.into()], "ceil").map_err(llvm_err)?.try_as_basic_value().left().ok_or("ceil failed")?.into_float_value();
+                let r = self.builder.build_call(f, &[fv.into()], "ceil").map_err(llvm_err)?.try_as_basic_value().basic().ok_or("ceil failed")?.into_float_value();
                 Ok(TypedValue::Float(r))
             }
             "round" => {
@@ -5582,7 +5582,7 @@ impl<'ctx> CodeGen<'ctx> {
                 let v = self.compile_expr(&args[0])?;
                 let fv = self.typed_to_float(&v)?;
                 let f = self.module.get_function("round").unwrap();
-                let r = self.builder.build_call(f, &[fv.into()], "round").map_err(llvm_err)?.try_as_basic_value().left().ok_or("round failed")?.into_float_value();
+                let r = self.builder.build_call(f, &[fv.into()], "round").map_err(llvm_err)?.try_as_basic_value().basic().ok_or("round failed")?.into_float_value();
                 Ok(TypedValue::Float(r))
             }
             "pi" => {
@@ -5682,7 +5682,7 @@ impl<'ctx> CodeGen<'ctx> {
                             _ => return Err("internal error".to_string()),
                         };
                         let cc = self.call_rt("atomic_string_concat", &[prefix_sv.into(), sv.into()])?;
-                        let full = cc.try_as_basic_value().left().ok_or("concat failed")?;
+                        let full = cc.try_as_basic_value().basic().ok_or("concat failed")?;
                         let _ = self.call_rt("atomic_print_string", &[full.into()])?;
                         let _ = self.call_rt("atomic_println", &[])?;
                         let exit_fn = self.module.get_function("exit");
@@ -5707,14 +5707,14 @@ impl<'ctx> CodeGen<'ctx> {
                 match v {
                     TypedValue::Int(iv) => {
                         let cc = self.call_rt("atomic_int_to_string", &[iv.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("int_to_string failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("int_to_string failed")?;
                         let alloca = self.builder.build_alloca(self.string_type, "str").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::Str(alloca))
                     }
                     TypedValue::Float(fv) => {
                         let cc = self.call_rt("atomic_float_to_string", &[fv.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("float_to_string failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("float_to_string failed")?;
                         let alloca = self.builder.build_alloca(self.string_type, "fstr").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::Str(alloca))
@@ -5767,7 +5767,7 @@ impl<'ctx> CodeGen<'ctx> {
                         // Some block: wrap element in Option::Some
                         self.builder.position_at_end(some_bb);
                         let elem = self.call_rt("atomic_list_get", &[list_val.into(), zero.into()])?;
-                        let elem_bv = elem.try_as_basic_value().left().ok_or("get failed")?;
+                        let elem_bv = elem.try_as_basic_value().basic().ok_or("get failed")?;
                         let fat_size = self.i64_ty().const_int(16, false);
                         let fat_heap = self.malloc_rc(fat_size)?;
                         self.builder.build_store(fat_heap, elem_bv).map_err(llvm_err)?;
@@ -5816,7 +5816,7 @@ impl<'ctx> CodeGen<'ctx> {
                         // Some block: wrap element in Option::Some
                         self.builder.position_at_end(some_bb);
                         let elem = self.call_rt("atomic_list_get", &[list_val.into(), last_idx.into()])?;
-                        let elem_bv = elem.try_as_basic_value().left().ok_or("get failed")?;
+                        let elem_bv = elem.try_as_basic_value().basic().ok_or("get failed")?;
                         let fat_size = self.i64_ty().const_int(16, false);
                         let fat_heap = self.malloc_rc(fat_size)?;
                         self.builder.build_store(fat_heap, elem_bv).map_err(llvm_err)?;
@@ -5866,7 +5866,7 @@ impl<'ctx> CodeGen<'ctx> {
                         // Some block: wrap element in Option::Some
                         self.builder.position_at_end(some_bb);
                         let elem = self.call_rt("atomic_list_get", &[lv.into(), (*iv).into()])?;
-                        let elem_bv = elem.try_as_basic_value().left().ok_or("get failed")?;
+                        let elem_bv = elem.try_as_basic_value().basic().ok_or("get failed")?;
                         // Allocate heap memory for the fat value and store it
                         let fat_size = self.i64_ty().const_int(16, false);
                         let fat_heap = self.malloc_rc(fat_size)?;
@@ -5907,7 +5907,7 @@ impl<'ctx> CodeGen<'ctx> {
                     TypedValue::List(lp) => {
                         let lv = self.load_list(lp)?;
                         let cc = self.call_rt("atomic_list_reverse", &[lv.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("reverse failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("reverse failed")?;
                         let alloca = self.builder.build_alloca(self.list_type, "rev").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::List(alloca))
@@ -5924,14 +5924,14 @@ impl<'ctx> CodeGen<'ctx> {
                         let lv = self.load_list(*lp)?;
                         let fat = self.to_fat_struct(&elem_val)?;
                         let cc = self.call_rt("atomic_list_contains", &[lv.into(), fat.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("contains failed")?.into_int_value();
+                        let result = cc.try_as_basic_value().basic().ok_or("contains failed")?.into_int_value();
                         Ok(TypedValue::Bool(result))
                     }
                     (TypedValue::Set(sp), _) => {
                         let lv = self.load_list(*sp)?;
                         let fat = self.to_fat_struct(&elem_val)?;
                         let cc = self.call_rt("atomic_list_contains", &[lv.into(), fat.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("contains failed")?.into_int_value();
+                        let result = cc.try_as_basic_value().basic().ok_or("contains failed")?.into_int_value();
                         Ok(TypedValue::Bool(result))
                     }
                     _ => Err("contains: first argument must be a list or set".to_string()),
@@ -5946,7 +5946,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let lv = self.load_list(*mp)?;
                         let key_fat = self.to_fat_struct(&key_val)?;
                         let cc = self.call_rt("atomic_map_contains", &[lv.into(), key_fat.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("map_contains failed")?.into_int_value();
+                        let result = cc.try_as_basic_value().basic().ok_or("map_contains failed")?.into_int_value();
                         Ok(TypedValue::Bool(result))
                     }
                     _ => Err("contains_key: first argument must be a map".to_string()),
@@ -5962,14 +5962,14 @@ impl<'ctx> CodeGen<'ctx> {
                         let len_bv = self.builder.build_extract_value(lv, 1, "len").map_err(llvm_err)?.into_int_value();
                         let new_cap = self.builder.build_int_add(len_bv, self.i64_ty().const_int(4, false), "new_cap").map_err(llvm_err)?;
                         let new_list = self.call_rt("atomic_list_create", &[new_cap.into()])?;
-                        let new_list_bv = new_list.try_as_basic_value().left().ok_or("create failed")?;
+                        let new_list_bv = new_list.try_as_basic_value().basic().ok_or("create failed")?;
                         let alloca = self.builder.build_alloca(self.list_type, "prepend").map_err(llvm_err)?;
                         self.builder.build_store(alloca, new_list_bv).map_err(llvm_err)?;
                         // Push element first
                         let fat = self.to_fat_struct(&elem_val)?;
                         let lv2 = self.load_list(alloca)?;
                         let pushed1 = self.call_rt("atomic_list_push", &[lv2.into(), fat.into()])?;
-                        let pb1 = pushed1.try_as_basic_value().left().ok_or("push1 failed")?;
+                        let pb1 = pushed1.try_as_basic_value().basic().ok_or("push1 failed")?;
                         self.builder.build_store(alloca, pb1).map_err(llvm_err)?;
                         // Then push all original elements
                         let current_fn = self.builder.get_insert_block().and_then(|b| b.get_parent()).ok_or("no fn")?;
@@ -5982,9 +5982,9 @@ impl<'ctx> CodeGen<'ctx> {
                         let lv_orig = self.load_list(lp)?;
                         let lv_cur = self.load_list(alloca)?;
                         let elem = self.call_rt("atomic_list_get", &[lv_orig.into(), i.as_basic_value().into_int_value().into()])?;
-                        let elem_bv = elem.try_as_basic_value().left().ok_or("get failed")?;
+                        let elem_bv = elem.try_as_basic_value().basic().ok_or("get failed")?;
                         let pushed = self.call_rt("atomic_list_push", &[lv_cur.into(), elem_bv.into()])?;
-                        let pb = pushed.try_as_basic_value().left().ok_or("push2 failed")?;
+                        let pb = pushed.try_as_basic_value().basic().ok_or("push2 failed")?;
                         self.builder.build_store(alloca, pb).map_err(llvm_err)?;
                         let ni = self.builder.build_int_add(i.as_basic_value().into_int_value(), self.i64_ty().const_int(1, false), "pp_ni").map_err(llvm_err)?;
                         let done_cond = self.builder.build_int_compare(IntPredicate::SGE, ni, len_bv, "pp_done").map_err(llvm_err)?;
@@ -6005,7 +6005,7 @@ impl<'ctx> CodeGen<'ctx> {
                     (TypedValue::List(lp), TypedValue::Int(nv)) => {
                         let lv = self.load_list(*lp)?;
                         let cc = self.call_rt("atomic_list_take", &[lv.into(), (*nv).into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("take failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("take failed")?;
                         let alloca = self.builder.build_alloca(self.list_type, "take").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::List(alloca))
@@ -6021,7 +6021,7 @@ impl<'ctx> CodeGen<'ctx> {
                     (TypedValue::List(lp), TypedValue::Int(nv)) => {
                         let lv = self.load_list(*lp)?;
                         let cc = self.call_rt("atomic_list_drop", &[lv.into(), (*nv).into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("drop failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("drop failed")?;
                         let alloca = self.builder.build_alloca(self.list_type, "drop").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::List(alloca))
@@ -6036,7 +6036,7 @@ impl<'ctx> CodeGen<'ctx> {
                 match (&start, &end) {
                     (TypedValue::Int(sv), TypedValue::Int(ev)) => {
                         let cc = self.call_rt("atomic_list_range", &[(*sv).into(), (*ev).into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("range failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("range failed")?;
                         let alloca = self.builder.build_alloca(self.list_type, "range").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::List(alloca))
@@ -6052,7 +6052,7 @@ impl<'ctx> CodeGen<'ctx> {
                     TypedValue::Int(cv) => {
                         let cap = self.i64_ty().const_int(4, false);
                         let new_list = self.call_rt("atomic_list_create", &[cap.into()])?;
-                        let new_list_bv = new_list.try_as_basic_value().left().ok_or("create failed")?;
+                        let new_list_bv = new_list.try_as_basic_value().basic().ok_or("create failed")?;
                         let alloca = self.builder.build_alloca(self.list_type, "repeat").map_err(llvm_err)?;
                         self.builder.build_store(alloca, new_list_bv).map_err(llvm_err)?;
                         let fat = self.to_fat_struct(&val)?;
@@ -6065,7 +6065,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let i = self.builder.build_phi(self.i64_ty(), "rep_i").map_err(llvm_err)?;
                         let lv = self.load_list(alloca)?;
                         let pushed = self.call_rt("atomic_list_push", &[lv.into(), fat.into()])?;
-                        let pb = pushed.try_as_basic_value().left().ok_or("push failed")?;
+                        let pb = pushed.try_as_basic_value().basic().ok_or("push failed")?;
                         self.builder.build_store(alloca, pb).map_err(llvm_err)?;
                         let ni = self.builder.build_int_add(i.as_basic_value().into_int_value(), self.i64_ty().const_int(1, false), "rep_ni").map_err(llvm_err)?;
                         let done_cond = self.builder.build_int_compare(IntPredicate::SGE, ni, cv, "rep_done").map_err(llvm_err)?;
@@ -6085,7 +6085,7 @@ impl<'ctx> CodeGen<'ctx> {
                     TypedValue::Str(p) => {
                         let s = self.load_string(p)?;
                         let cc = self.call_rt("atomic_string_trim_start", &[s.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("trim_start failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("trim_start failed")?;
                         let alloca = self.builder.build_alloca(self.string_type, "trimmed_start").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::Str(alloca))
@@ -6100,7 +6100,7 @@ impl<'ctx> CodeGen<'ctx> {
                     TypedValue::Str(p) => {
                         let s = self.load_string(p)?;
                         let cc = self.call_rt("atomic_string_trim_end", &[s.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("trim_end failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("trim_end failed")?;
                         let alloca = self.builder.build_alloca(self.string_type, "trimmed_end").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::Str(alloca))
@@ -6117,7 +6117,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let sv = self.load_string(*sp)?;
                         let subv = self.load_string(*subp)?;
                         let cc = self.call_rt("atomic_string_contains", &[sv.into(), subv.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("string_contains failed")?.into_int_value();
+                        let result = cc.try_as_basic_value().basic().ok_or("string_contains failed")?.into_int_value();
                         Ok(TypedValue::Bool(result))
                     }
                     _ => Err("string_contains: arguments must be strings".to_string()),
@@ -6131,7 +6131,7 @@ impl<'ctx> CodeGen<'ctx> {
                     (TypedValue::Str(sp), TypedValue::Int(cv)) => {
                         let sv = self.load_string(sp)?;
                         let cc = self.call_rt("atomic_string_repeat", &[sv.into(), cv.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("string_repeat failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("string_repeat failed")?;
                         let alloca = self.builder.build_alloca(self.string_type, "str_repeat").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::Str(alloca))
@@ -6148,7 +6148,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let len = self.builder.build_extract_value(lv, 1, "len").map_err(llvm_err)?.into_int_value();
                         let is_empty = self.builder.build_int_compare(IntPredicate::EQ, len, self.i64_ty().const_int(0, false), "empty").map_err(llvm_err)?;
                         let cc = self.call_rt("atomic_list_tail", &[lv.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("tail failed")?.into_struct_value();
+                        let result = cc.try_as_basic_value().basic().ok_or("tail failed")?.into_struct_value();
                         self.build_option_list(result, is_empty)
                     }
                     _ => Err("tail: argument must be a list".to_string()),
@@ -6163,7 +6163,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let lv1 = self.load_list(*lp1)?;
                         let lv2 = self.load_list(*lp2)?;
                         let cc = self.call_rt("atomic_list_zip", &[lv1.into(), lv2.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("zip failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("zip failed")?;
                         let alloca = self.builder.build_alloca(self.list_type, "zip").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::List(alloca))
@@ -6178,7 +6178,7 @@ impl<'ctx> CodeGen<'ctx> {
                     TypedValue::Str(sp) => {
                         let sv = self.load_string(sp)?;
                         let cc = self.call_rt("atomic_string_split_lines", &[sv.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("split_lines failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("split_lines failed")?;
                         let alloca = self.builder.build_alloca(self.list_type, "lines").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::List(alloca))
@@ -6196,7 +6196,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let lv = self.load_list(*lp)?;
                         let fat = self.to_fat_struct(elem)?;
                         let cc = self.call_rt("atomic_list_index_of", &[lv.into(), fat.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("index_of failed")?.into_int_value();
+                        let result = cc.try_as_basic_value().basic().ok_or("index_of failed")?.into_int_value();
                         let found = self.builder.build_int_compare(IntPredicate::SGE, result, self.i64_ty().const_int(0, false), "found").map_err(llvm_err)?;
                         self.build_option_int(result, found)
                     }
@@ -6206,7 +6206,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let sv2 = self.load_string(*sp2)?;
                         // runtime expects (haystack, needle), so swap: sv2 is haystack, sv1 is needle
                         let cc = self.call_rt("atomic_string_index_of", &[sv2.into(), sv1.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("index_of failed")?.into_int_value();
+                        let result = cc.try_as_basic_value().basic().ok_or("index_of failed")?.into_int_value();
                         let neg_one = self.i64_ty().const_int((-1i64) as u64, true);
                         let found = self.builder.build_int_compare(IntPredicate::NE, result, neg_one, "found").map_err(llvm_err)?;
                         self.build_option_int(result, found)
@@ -6223,7 +6223,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let len = self.builder.build_extract_value(lv, 1, "len").map_err(llvm_err)?.into_int_value();
                         let is_empty = self.builder.build_int_compare(IntPredicate::EQ, len, self.i64_ty().const_int(0, false), "empty").map_err(llvm_err)?;
                         let cc = self.call_rt("atomic_list_init", &[lv.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("init failed")?.into_struct_value();
+                        let result = cc.try_as_basic_value().basic().ok_or("init failed")?.into_struct_value();
                         self.build_option_list(result, is_empty)
                     }
                     _ => Err("init: argument must be a list".to_string()),
@@ -6236,7 +6236,7 @@ impl<'ctx> CodeGen<'ctx> {
                     TypedValue::Str(sp) => {
                         let sv = self.load_string(sp)?;
                         let cc = self.call_rt("atomic_string_chars", &[sv.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("chars failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("chars failed")?;
                         let alloca = self.builder.build_alloca(self.list_type, "chars").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::List(alloca))
@@ -6367,14 +6367,14 @@ impl<'ctx> CodeGen<'ctx> {
                         self.builder.position_at_end(has_elem);
                         let idx = self.builder.build_int_sub(len, self.i64_ty().const_int(1, false), "max_idx").map_err(llvm_err)?;
                         let cc = self.call_rt("atomic_rand_int", &[self.i64_ty().const_int(0, false).into(), idx.into()])?;
-                        let ri = cc.try_as_basic_value().left().unwrap().into_int_value();
+                        let ri = cc.try_as_basic_value().unwrap_basic().into_int_value();
                         let data = self.builder.build_extract_value(lv, 0, "data").map_err(llvm_err)?.into_pointer_value();
                         let ep = unsafe { self.builder.build_gep(self.string_type, data, &[ri], "ep").map_err(llvm_err) }?;
                         let elem = self.builder.build_load(self.string_type, ep, "elem").map_err(llvm_err)?.into_struct_value();
                         // Wrap in Some: tag=1, data=ptr to elem copy
                         let malloc = self.module.get_function("malloc").unwrap();
                         let some_ptr = self.builder.build_call(malloc, &[self.i64_ty().const_int(16, false).into()], "some").map_err(llvm_err)?
-                            .try_as_basic_value().left().unwrap().into_pointer_value();
+                            .try_as_basic_value().unwrap_basic().into_pointer_value();
                         self.builder.build_store(some_ptr, elem).map_err(llvm_err)?;
                         let some_fat = self.string_type.get_undef();
                         let some1 = self.builder.build_insert_value(some_fat, self.i64_ty().const_int(1, false), 0, "some_tag").map_err(llvm_err)?;
@@ -6427,7 +6427,7 @@ impl<'ctx> CodeGen<'ctx> {
                     TypedValue::Str(sp) => {
                         let sv = self.load_string(sp)?;
                         let cc = self.call_rt("atomic_parse_int", &[sv.into()])?;
-                        let result_struct = cc.try_as_basic_value().left().ok_or("parse_int failed")?.into_struct_value();
+                        let result_struct = cc.try_as_basic_value().basic().ok_or("parse_int failed")?.into_struct_value();
                         let val = self.builder.build_extract_value(result_struct, 0, "val").map_err(llvm_err)?.into_int_value();
                         let ok = self.builder.build_extract_value(result_struct, 1, "ok").map_err(llvm_err)?.into_int_value();
                         self.build_option_int(val, ok)
@@ -6465,7 +6465,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let strtod_fn = self.module.get_function("strtod").unwrap();
                         let null_ptr = self.ptr_ty().const_zero();
                         let result = self.builder.build_call(strtod_fn, &[data_ptr.into(), null_ptr.into()], "fval").map_err(llvm_err)?
-                            .try_as_basic_value().left().ok_or("strtod failed")?.into_float_value();
+                            .try_as_basic_value().basic().ok_or("strtod failed")?.into_float_value();
                         self.build_option_float(result, ok)
                     }
                     _ => Err("to_float: cannot convert to Float".to_string()),
@@ -6478,7 +6478,7 @@ impl<'ctx> CodeGen<'ctx> {
                     TypedValue::List(lp) => {
                         let lv = self.load_list(lp)?;
                         let cc = self.call_rt("atomic_list_with_index", &[lv.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("with_index failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("with_index failed")?;
                         let alloca = self.builder.build_alloca(self.list_type, "wi").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::List(alloca))
@@ -6493,7 +6493,7 @@ impl<'ctx> CodeGen<'ctx> {
                     TypedValue::List(lp) => {
                         let lv = self.load_list(lp)?;
                         let cc = self.call_rt("atomic_list_unique", &[lv.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("unique failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("unique failed")?;
                         let alloca = self.builder.build_alloca(self.list_type, "unique").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::List(alloca))
@@ -6511,7 +6511,7 @@ impl<'ctx> CodeGen<'ctx> {
                     (TypedValue::List(lp), TypedValue::Int(sv), TypedValue::Int(ev)) => {
                         let lv = self.load_list(*lp)?;
                         let cc = self.call_rt("atomic_list_slice", &[lv.into(), (*sv).into(), (*ev).into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("slice failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("slice failed")?;
                         let alloca = self.builder.build_alloca(self.list_type, "slice").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::List(alloca))
@@ -6522,7 +6522,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let len = self.builder.build_int_sub(*ev, *sv, "slice_len").map_err(llvm_err)?;
                         let cc = self.call_rt("atomic_string_substring",
                             &[str_val.into(), (*sv).into(), len.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("slice failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("slice failed")?;
                         let alloca = self.builder.build_alloca(self.string_type, "slice_str").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::Str(alloca))
@@ -6537,7 +6537,7 @@ impl<'ctx> CodeGen<'ctx> {
                     TypedValue::List(lp) => {
                         let lv = self.load_list(lp)?;
                         let cc = self.call_rt("atomic_list_flatten", &[lv.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("flatten failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("flatten failed")?;
                         let alloca = self.builder.build_alloca(self.list_type, "flatten").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::List(alloca))
@@ -6553,7 +6553,7 @@ impl<'ctx> CodeGen<'ctx> {
                     (TypedValue::List(lp), TypedValue::Int(iv)) => {
                         let lv = self.load_list(*lp)?;
                         let cc = self.call_rt("atomic_list_split_at", &[lv.into(), (*iv).into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("split_at failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("split_at failed")?;
                         let alloca = self.builder.build_alloca(self.list_type, "split_at").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::List(alloca))
@@ -6569,7 +6569,7 @@ impl<'ctx> CodeGen<'ctx> {
                     (TypedValue::List(lp), TypedValue::Int(sv)) => {
                         let lv = self.load_list(*lp)?;
                         let cc = self.call_rt("atomic_list_chunks", &[lv.into(), (*sv).into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("chunks failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("chunks failed")?;
                         let alloca = self.builder.build_alloca(self.list_type, "chunks").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::List(alloca))
@@ -6585,7 +6585,7 @@ impl<'ctx> CodeGen<'ctx> {
                     (TypedValue::List(lp), TypedValue::Int(sv)) => {
                         let lv = self.load_list(*lp)?;
                         let cc = self.call_rt("atomic_list_windows", &[lv.into(), (*sv).into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("windows failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("windows failed")?;
                         let alloca = self.builder.build_alloca(self.list_type, "windows").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::List(alloca))
@@ -6600,27 +6600,27 @@ impl<'ctx> CodeGen<'ctx> {
                 match (&base, &exp) {
                     (TypedValue::Float(bv), TypedValue::Float(ev)) => {
                         let cc = self.call_rt("atomic_pow", &[(*bv).into(), (*ev).into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("pow failed")?.into_float_value();
+                        let result = cc.try_as_basic_value().basic().ok_or("pow failed")?.into_float_value();
                         Ok(TypedValue::Float(result))
                     }
                     (TypedValue::Int(bv), TypedValue::Int(ev)) => {
                         let bf = self.builder.build_signed_int_to_float(*bv, self.f64_ty(), "bf").map_err(llvm_err)?;
                         let ef = self.builder.build_signed_int_to_float(*ev, self.f64_ty(), "ef").map_err(llvm_err)?;
                         let cc = self.call_rt("atomic_pow", &[bf.into(), ef.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("pow failed")?.into_float_value();
+                        let result = cc.try_as_basic_value().basic().ok_or("pow failed")?.into_float_value();
                         Ok(TypedValue::Float(result))
                     }
                     // Mixed Int/Float → promote Int to Float
                     (TypedValue::Int(bv), TypedValue::Float(ev)) => {
                         let bf = self.builder.build_signed_int_to_float(*bv, self.f64_ty(), "bf").map_err(llvm_err)?;
                         let cc = self.call_rt("atomic_pow", &[bf.into(), (*ev).into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("pow failed")?.into_float_value();
+                        let result = cc.try_as_basic_value().basic().ok_or("pow failed")?.into_float_value();
                         Ok(TypedValue::Float(result))
                     }
                     (TypedValue::Float(bv), TypedValue::Int(ev)) => {
                         let ef = self.builder.build_signed_int_to_float(*ev, self.f64_ty(), "ef").map_err(llvm_err)?;
                         let cc = self.call_rt("atomic_pow", &[(*bv).into(), ef.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("pow failed")?.into_float_value();
+                        let result = cc.try_as_basic_value().basic().ok_or("pow failed")?.into_float_value();
                         Ok(TypedValue::Float(result))
                     }
                     _ => Err("pow: arguments must be numeric".to_string()),
@@ -6633,7 +6633,7 @@ impl<'ctx> CodeGen<'ctx> {
                     TypedValue::Map(mp) => {
                         let mv = self.load_list(mp)?;
                         let cc = self.call_rt("atomic_map_keys", &[mv.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("map_keys failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("map_keys failed")?;
                         let alloca = self.builder.build_alloca(self.list_type, "keys").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::List(alloca))
@@ -6648,7 +6648,7 @@ impl<'ctx> CodeGen<'ctx> {
                     TypedValue::Map(mp) => {
                         let mv = self.load_list(mp)?;
                         let cc = self.call_rt("atomic_map_values", &[mv.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("map_values failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("map_values failed")?;
                         let alloca = self.builder.build_alloca(self.list_type, "values").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::List(alloca))
@@ -6663,7 +6663,7 @@ impl<'ctx> CodeGen<'ctx> {
                     TypedValue::Map(mp) => {
                         let mv = self.load_list(mp)?;
                         let cc = self.call_rt("atomic_map_entries", &[mv.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("map_entries failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("map_entries failed")?;
                         let alloca = self.builder.build_alloca(self.list_type, "entries").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::List(alloca))
@@ -6680,7 +6680,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let mv1 = self.load_list(*mp1)?;
                         let mv2 = self.load_list(*mp2)?;
                         let cc = self.call_rt("atomic_map_union", &[mv1.into(), mv2.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("map_union failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("map_union failed")?;
                         let alloca = self.builder.build_alloca(self.list_type, "map_union").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::Map(alloca))
@@ -6697,7 +6697,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let sv1 = self.load_list(*sp1)?;
                         let sv2 = self.load_list(*sp2)?;
                         let cc = self.call_rt("atomic_set_union", &[sv1.into(), sv2.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("set_union failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("set_union failed")?;
                         let alloca = self.builder.build_alloca(self.list_type, "union").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::Set(alloca))
@@ -6714,7 +6714,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let sv1 = self.load_list(*sp1)?;
                         let sv2 = self.load_list(*sp2)?;
                         let cc = self.call_rt("atomic_set_intersection", &[sv1.into(), sv2.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("set_intersection failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("set_intersection failed")?;
                         let alloca = self.builder.build_alloca(self.list_type, "intersection").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::Set(alloca))
@@ -6731,7 +6731,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let sv1 = self.load_list(*sp1)?;
                         let sv2 = self.load_list(*sp2)?;
                         let cc = self.call_rt("atomic_set_difference", &[sv1.into(), sv2.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("set_difference failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("set_difference failed")?;
                         let alloca = self.builder.build_alloca(self.list_type, "difference").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::Set(alloca))
@@ -6748,7 +6748,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let sv1 = self.load_list(*sp1)?;
                         let sv2 = self.load_list(*sp2)?;
                         let cc = self.call_rt("atomic_set_is_subset", &[sv1.into(), sv2.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("set_is_subset failed")?.into_int_value();
+                        let result = cc.try_as_basic_value().basic().ok_or("set_is_subset failed")?.into_int_value();
                         Ok(TypedValue::Bool(result))
                     }
                     _ => Err("set_is_subset: arguments must be sets".to_string()),
@@ -6761,7 +6761,7 @@ impl<'ctx> CodeGen<'ctx> {
                     TypedValue::List(lp) => {
                         let lv = self.load_list(lp)?;
                         let cc = self.call_rt("atomic_rand_shuffle", &[lv.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("rand_shuffle failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("rand_shuffle failed")?;
                         let alloca = self.builder.build_alloca(self.list_type, "shuffled").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::List(alloca))
@@ -6776,7 +6776,7 @@ impl<'ctx> CodeGen<'ctx> {
                     TypedValue::List(lp) => {
                         let lv = self.load_list(lp)?;
                         let cc = self.call_rt("atomic_list_sorted", &[lv.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("sorted failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("sorted failed")?;
                         let alloca = self.builder.build_alloca(self.list_type, "sorted").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::List(alloca))
@@ -6791,7 +6791,7 @@ impl<'ctx> CodeGen<'ctx> {
                     TypedValue::Str(p) => {
                         let s = self.load_string(p)?;
                         let cc = self.call_rt("atomic_read_dir", &[s.into()])?;
-                        let result = cc.try_as_basic_value().left().ok_or("read_dir failed")?;
+                        let result = cc.try_as_basic_value().basic().ok_or("read_dir failed")?;
                         let alloca = self.builder.build_alloca(self.list_type, "read_dir").map_err(llvm_err)?;
                         self.builder.build_store(alloca, result).map_err(llvm_err)?;
                         Ok(TypedValue::List(alloca))
@@ -7062,7 +7062,7 @@ impl<'ctx> CodeGen<'ctx> {
                 let final_dc = self.builder.build_select(is_zero, one, ndigits, "fdc").map_err(llvm_err)?.into_int_value();
                 // Create result list with capacity = final_dc
                 let cc = self.call_rt("atomic_list_create", &[final_dc.into()])?;
-                let res_bv = cc.try_as_basic_value().left().ok_or("list_create failed")?;
+                let res_bv = cc.try_as_basic_value().basic().ok_or("list_create failed")?;
                 let res_a = self.builder.build_alloca(self.list_type, "digits_res").map_err(llvm_err)?;
                 self.builder.build_store(res_a, res_bv).map_err(llvm_err)?;
                 // Compute 10^(ndigits-1) iteratively
@@ -7112,7 +7112,7 @@ impl<'ctx> CodeGen<'ctx> {
                 let d2 = self.builder.build_insert_value(d1, self.ptr_ty().const_zero(), 1, "d2").map_err(llvm_err)?;
                 let rl = self.builder.build_load(self.list_type, res_a, "rl").map_err(llvm_err)?.into_struct_value();
                 let rp = self.call_rt("atomic_list_push", &[rl.into(), d2.as_basic_value_enum().into()])?;
-                self.builder.build_store(res_a, rp.try_as_basic_value().left().unwrap()).map_err(llvm_err)?;
+                self.builder.build_store(res_a, rp.try_as_basic_value().unwrap_basic()).map_err(llvm_err)?;
                 // Advance: i++, pow10 /= 10
                 let ndi = self.builder.build_int_add(div, one, "ndi").map_err(llvm_err)?;
                 self.builder.build_store(di_a, ndi).map_err(llvm_err)?;
@@ -7140,12 +7140,12 @@ impl<'ctx> CodeGen<'ctx> {
                 let gep = unsafe { self.builder.build_gep(self.context.i8_type(), sdata, &[real_idx], "gep").map_err(llvm_err)? };
                 let ch = self.builder.build_load(self.context.i8_type(), gep, "ch").map_err(llvm_err)?.into_int_value();
                 let nbytes = self.call_rt("atomic_utf8_byte_len", &[ch.into()])?
-                    .try_as_basic_value().left().unwrap().into_int_value();
+                    .try_as_basic_value().unwrap_basic().into_int_value();
                 // Allocate nbytes+1 (for null terminator)
                 let alloc_sz = self.builder.build_int_add(nbytes, self.i64_ty().const_int(1, false), "alloc_sz").map_err(llvm_err)?;
                 let malloc_fn = self.module.get_function("malloc").unwrap();
                 let buf = self.builder.build_call(malloc_fn, &[alloc_sz.into()], "buf").map_err(llvm_err)?
-                    .try_as_basic_value().left().unwrap().into_pointer_value();
+                    .try_as_basic_value().unwrap_basic().into_pointer_value();
                 // memcpy nbytes from sdata+real_idx to buf
                 let memcpy_fn = self.module.get_function("memcpy").unwrap();
                 let src = unsafe { self.builder.build_gep(self.context.i8_type(), sdata, &[real_idx], "src").map_err(llvm_err) }?;
@@ -7192,10 +7192,10 @@ impl<'ctx> CodeGen<'ctx> {
                 let malloc_fn = self.module.get_function("malloc").unwrap();
                 let alloc_sz = i64.const_int(5, false);
                 let buf = self.builder.build_call(malloc_fn, &[alloc_sz.into()], "buf").map_err(llvm_err)?
-                    .try_as_basic_value().left().unwrap().into_pointer_value();
+                    .try_as_basic_value().unwrap_basic().into_pointer_value();
                 // Call runtime UTF-8 encoder: nbytes = atomic_utf8_encode(code, buf)
                 let nbytes = self.call_rt("atomic_utf8_encode", &[code.into(), buf.into()])?
-                    .try_as_basic_value().left().unwrap().into_int_value();
+                    .try_as_basic_value().unwrap_basic().into_int_value();
                 // Null terminate at position nbytes
                 let null_g = unsafe { self.builder.build_gep(i8, buf, &[nbytes], "null_g").map_err(llvm_err) }?;
                 self.builder.build_store(null_g, i8.const_int(0, false)).map_err(llvm_err)?;
@@ -7214,11 +7214,11 @@ impl<'ctx> CodeGen<'ctx> {
                 let time_fn = self.module.get_function("time").ok_or("time function not found")?;
                 let null_ptr = self.ptr_ty().const_null();
                 let ts = self.builder.build_call(time_fn, &[null_ptr.into()], "ts").map_err(llvm_err)?;
-                let ts_val = ts.try_as_basic_value().left().unwrap().into_int_value();
+                let ts_val = ts.try_as_basic_value().unwrap_basic().into_int_value();
                 let gmtime_fn = self.module.get_function("gmtime_r").ok_or("gmtime_r function not found")?;
                 let tm_ptr = self.builder.build_alloca(sty, "tm").map_err(llvm_err)?;
                 let gmtime_call = self.builder.build_call(gmtime_fn, &[ts_val.into(), tm_ptr.into()], "").map_err(llvm_err)?;
-                let _ = gmtime_call.try_as_basic_value().left();
+                let _ = gmtime_call.try_as_basic_value().basic();
                 // Copy tm struct to result (year+1900, month, day, hour, min, sec)
                 for i in 0..6u32 {
                     let src_p = self.builder.build_struct_gep(sty, tm_ptr, i, "tm_f").map_err(llvm_err)?;
@@ -7337,13 +7337,13 @@ impl<'ctx> CodeGen<'ctx> {
                         let buf_size = self.i64_ty().const_int(256, false);
                         let malloc_fn = self.module.get_function("malloc").unwrap();
                         let buf = self.builder.build_call(malloc_fn, &[buf_size.into()], "fmt_buf").map_err(llvm_err)?
-                            .try_as_basic_value().left().unwrap().into_pointer_value();
+                            .try_as_basic_value().unwrap_basic().into_pointer_value();
                         let strftime_fn = self.module.get_function("strftime").ok_or("strftime not found")?;
                         let _ = self.builder.build_call(strftime_fn, &[buf.into(), buf_size.into(), fmt_data.into(), tm_a.into()], "").map_err(llvm_err)?;
                         // Build Atomic string: {i64, i8*} with strlen
                         let strlen_fn = self.module.get_function("strlen").ok_or("strlen not found")?;
                         let len = self.builder.build_call(strlen_fn, &[buf.into()], "fmt_len").map_err(llvm_err)?
-                            .try_as_basic_value().left().unwrap().into_int_value();
+                            .try_as_basic_value().unwrap_basic().into_int_value();
                         let fat = self.string_type.get_undef();
                         let r1 = self.builder.build_insert_value(fat, len, 0, "r1").map_err(llvm_err)?;
                         let r2 = self.builder.build_insert_value(r1, buf, 1, "r2").map_err(llvm_err)?;
@@ -7379,7 +7379,7 @@ impl<'ctx> CodeGen<'ctx> {
                             m_ptr.into(),
                             d_ptr.into(),
                         ], "pd_ret").map_err(llvm_err)?
-                            .try_as_basic_value().left().unwrap().into_int_value();
+                            .try_as_basic_value().unwrap_basic().into_int_value();
                         let ok = self.builder.build_int_compare(IntPredicate::EQ, ret, i32_ty.const_int(3, false), "pd_ok").map_err(llvm_err)?;
                         // Build Option<Date>
                         let enum_ty = self.context.struct_type(&[self.i64_ty().into(), self.ptr_ty().into()], false);
@@ -7402,7 +7402,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let date_size = self.i64_ty().const_int(24, false);
                         let malloc_fn = self.module.get_function("malloc").unwrap();
                         let heap = self.builder.build_call(malloc_fn, &[date_size.into()], "pd_heap").map_err(llvm_err)?
-                            .try_as_basic_value().left().unwrap().into_pointer_value();
+                            .try_as_basic_value().unwrap_basic().into_pointer_value();
                         let dp = self.builder.build_pointer_cast(heap, self.ptr_ty(), "dp").map_err(llvm_err)?;
                         let yp = self.builder.build_struct_gep(some_sty, dp, 0, "yp").map_err(llvm_err)?;
                         self.builder.build_store(yp, year_i64).map_err(llvm_err)?;
@@ -7493,7 +7493,7 @@ impl<'ctx> CodeGen<'ctx> {
                 let date_size = i64_ty.const_int(24, false);
                 let malloc_fn = self.module.get_function("malloc").unwrap();
                 let heap = self.builder.build_call(malloc_fn, &[date_size.into()], "d_heap").map_err(llvm_err)?
-                    .try_as_basic_value().left().unwrap().into_pointer_value();
+                    .try_as_basic_value().unwrap_basic().into_pointer_value();
                 let yp = self.builder.build_struct_gep(date_sty, heap, 0, "d_yp").map_err(llvm_err)?;
                 self.builder.build_store(yp, y).map_err(llvm_err)?;
                 let mp = self.builder.build_struct_gep(date_sty, heap, 1, "d_mp").map_err(llvm_err)?;
@@ -7587,7 +7587,7 @@ impl<'ctx> CodeGen<'ctx> {
                 let dt_size = i64_ty.const_int(48, false); // 6 * 8 bytes
                 let malloc_fn = self.module.get_function("malloc").unwrap();
                 let heap = self.builder.build_call(malloc_fn, &[dt_size.into()], "dt_heap").map_err(llvm_err)?
-                    .try_as_basic_value().left().unwrap().into_pointer_value();
+                    .try_as_basic_value().unwrap_basic().into_pointer_value();
                 for (i, val) in [y, mo, d, h, min, s].iter().enumerate() {
                     let fp = self.builder.build_struct_gep(dt_sty, heap, i as u32, "dt_f").map_err(llvm_err)?;
                     self.builder.build_store(fp, *val).map_err(llvm_err)?;
@@ -7800,7 +7800,7 @@ impl<'ctx> CodeGen<'ctx> {
             }
             "ping" => {
                 let result = self.call_rt("atomic_test_ping", &[])?;
-                let val = result.try_as_basic_value().left()
+                let val = result.try_as_basic_value().basic()
                     .ok_or("ping call failed")?.into_int_value();
                 Ok(TypedValue::Int(val))
             }
@@ -7837,7 +7837,7 @@ impl<'ctx> CodeGen<'ctx> {
         // Call time(NULL) — pass null for tloc
         let null_ptr = ptr.const_zero();
         let now_ts = self.builder.build_call(time_fn, &[null_ptr.into()], "now_ts").map_err(llvm_err)?
-            .try_as_basic_value().left().ok_or("time() call failed")?;
+            .try_as_basic_value().basic().ok_or("time() call failed")?;
 
         // Allocate struct tm on stack, zero-init
         let tm_a = self.builder.build_alloca(tm_ty, "tm_buf").map_err(llvm_err)?;
@@ -7940,7 +7940,7 @@ impl<'ctx> CodeGen<'ctx> {
                 let size = self.builder.build_int_add(len, self.i64_ty().const_int(1, false), "cstr_size")
                     .map_err(llvm_err)?;
                 let cstr = self.call_rt("malloc", &[size.into()])?;
-                let cstr_ptr = cstr.try_as_basic_value().left().ok_or("malloc failed")?.into_pointer_value();
+                let cstr_ptr = cstr.try_as_basic_value().basic().ok_or("malloc failed")?.into_pointer_value();
                 // memcpy the string data (dest, src, len)
                 let _ = self.builder.build_memcpy(cstr_ptr, 1, data, 1, len).map_err(llvm_err)?;
                 // null terminate
@@ -7964,10 +7964,10 @@ impl<'ctx> CodeGen<'ctx> {
                 }
                 // strlen
                 let len_val = self.call_rt("strlen", &[ptr.into()])?;
-                let len = len_val.try_as_basic_value().left().ok_or("strlen failed")?.into_int_value();
+                let len = len_val.try_as_basic_value().basic().ok_or("strlen failed")?.into_int_value();
                 // allocate Atomic string
                 let str_struct = self.call_rt("atomic_string_create", &[ptr.into(), len.into()])?;
-                let str_val = str_struct.try_as_basic_value().left().ok_or("string_create failed")?;
+                let str_val = str_struct.try_as_basic_value().basic().ok_or("string_create failed")?;
                 let alloca = self.builder.build_alloca(self.string_type, "from_cstr").map_err(llvm_err)?;
                 self.builder.build_store(alloca, str_val).map_err(llvm_err)?;
                 Ok(TypedValue::Str(alloca))
@@ -8044,7 +8044,7 @@ impl<'ctx> CodeGen<'ctx> {
 
         // Use strlen to get body length (safe since we just null-terminated it)
         let body_len_val = self.call_rt("strlen", &[body_ptr.into()])?;
-        let body_len = body_len_val.try_as_basic_value().left()
+        let body_len = body_len_val.try_as_basic_value().basic()
             .ok_or("strlen failed")?.into_int_value();
 
         // Call atomic_http_request(method, url, headers, body, body_len)
@@ -8054,7 +8054,7 @@ impl<'ctx> CodeGen<'ctx> {
             method_ptr.into(), url_ptr.into(), headers_ptr.into(),
             body_ptr.into(), body_len.into(),
         ], "http_result").map_err(llvm_err)?;
-        let result_ptr = call_result.try_as_basic_value().left()
+        let result_ptr = call_result.try_as_basic_value().basic()
             .ok_or("call failed")?.into_pointer_value();
 
         // Free temp CStrings
@@ -8066,10 +8066,10 @@ impl<'ctx> CodeGen<'ctx> {
 
         // Convert result CString -> String (from_cstring logic inline)
         let res_len_val = self.call_rt("strlen", &[result_ptr.into()])?;
-        let res_len = res_len_val.try_as_basic_value().left()
+        let res_len = res_len_val.try_as_basic_value().basic()
             .ok_or("strlen failed")?.into_int_value();
         let str_struct = self.call_rt("atomic_string_create", &[result_ptr.into(), res_len.into()])?;
-        let str_val = str_struct.try_as_basic_value().left()
+        let str_val = str_struct.try_as_basic_value().basic()
             .ok_or("string_create failed")?;
         let alloca = self.builder.build_alloca(self.string_type, "http_resp")
             .map_err(llvm_err)?;

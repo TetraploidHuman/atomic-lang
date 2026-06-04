@@ -258,7 +258,7 @@ impl<'ctx> CodeGen<'ctx> {
         let result_list = if collect {
             let len = self.builder.build_int_sub(end_val, start_val, "est_len").map_err(llvm_err)?;
             let list_cc = self.call_rt("atomic_list_create", &[len.into()])?;
-            let list_bv = list_cc.try_as_basic_value().left().ok_or("list_create failed")?;
+            let list_bv = list_cc.try_as_basic_value().basic().ok_or("list_create failed")?;
             let result_alloca = self.builder.build_alloca(self.list_type, "collect_result").map_err(llvm_err)?;
             self.builder.build_store(result_alloca, list_bv).map_err(llvm_err)?;
             Some(result_alloca)
@@ -433,7 +433,7 @@ impl<'ctx> CodeGen<'ctx> {
         let result_list = if collect {
             let cap = i64.const_int(16, false);
             let list_cc = self.call_rt("atomic_list_create", &[cap.into()])?;
-            let list_bv = list_cc.try_as_basic_value().left().ok_or("list_create failed")?;
+            let list_bv = list_cc.try_as_basic_value().basic().ok_or("list_create failed")?;
             let ra = self.builder.build_alloca(self.list_type, "nested_result").map_err(llvm_err)?;
             self.builder.build_store(ra, list_bv).map_err(llvm_err)?;
             Some(ra)
@@ -490,7 +490,7 @@ impl<'ctx> CodeGen<'ctx> {
             let list_loaded = self.load_list(list_ptr)?;
             let elem_fat = self.to_fat_struct(&body_val)?;
             let push_cc = self.call_rt("atomic_list_push", &[list_loaded.into(), elem_fat.into()])?;
-            let pushed = push_cc.try_as_basic_value().left().ok_or("list_push failed")?;
+            let pushed = push_cc.try_as_basic_value().basic().ok_or("list_push failed")?;
             self.builder.build_store(list_ptr, pushed).map_err(llvm_err)?;
         }
 

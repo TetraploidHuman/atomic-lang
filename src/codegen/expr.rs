@@ -277,7 +277,7 @@ impl<'ctx> CodeGen<'ctx> {
         let g = self.builder.build_global_string_ptr(s, ".str").map_err(llvm_err)?;
         let len = self.i64_ty().const_int(s.len() as u64, false);
         let cc = self.call_rt("atomic_string_create", &[g.as_pointer_value().into(), len.into()])?;
-        match cc.try_as_basic_value().left() {
+        match cc.try_as_basic_value().basic() {
             Some(bv) => {
                 // String is returned as {i64, i8*} struct by value.
                 // Store it on the stack and use the pointer.
@@ -775,7 +775,7 @@ impl<'ctx> CodeGen<'ctx> {
                 Ok(TypedValue::Float(self.builder.build_float_add(*a, *b, "add").map_err(llvm_err)?)),
             (TypedValue::Str(a), TypedValue::Str(b)) => {
                 let cc = self.call_rt_with_2str("atomic_string_concat", *a, *b)?;
-                match cc.try_as_basic_value().left() {
+                match cc.try_as_basic_value().basic() {
                     Some(bv) => {
                         let alloca = self.builder.build_alloca(self.string_type, "concat").map_err(llvm_err)?;
                         self.builder.build_store(alloca, bv).map_err(llvm_err)?;
@@ -835,14 +835,14 @@ impl<'ctx> CodeGen<'ctx> {
                 let pow_fn = self.module.get_function("atomic_int_pow").unwrap();
                 let result = self.builder.build_call(pow_fn, &[(*a).into(), (*b).into()], "pow")
                     .map_err(llvm_err)?
-                    .try_as_basic_value().left().unwrap().into_int_value();
+                    .try_as_basic_value().unwrap_basic().into_int_value();
                 Ok(TypedValue::Int(result))
             }
             (TypedValue::Float(a), TypedValue::Float(b)) => {
                 let pow_fn = self.module.get_function("pow").unwrap();
                 let result = self.builder.build_call(pow_fn, &[(*a).into(), (*b).into()], "pow")
                     .map_err(llvm_err)?
-                    .try_as_basic_value().left().unwrap().into_float_value();
+                    .try_as_basic_value().unwrap_basic().into_float_value();
                 Ok(TypedValue::Float(result))
             }
             // Mixed Int/Float → promote to Float
@@ -852,7 +852,7 @@ impl<'ctx> CodeGen<'ctx> {
                 let pow_fn = self.module.get_function("pow").unwrap();
                 let result = self.builder.build_call(pow_fn, &[fa.into(), fb.into()], "pow")
                     .map_err(llvm_err)?
-                    .try_as_basic_value().left().unwrap().into_float_value();
+                    .try_as_basic_value().unwrap_basic().into_float_value();
                 Ok(TypedValue::Float(result))
             }
             _ => Err("** requires numeric operands".to_string()),
@@ -887,7 +887,7 @@ impl<'ctx> CodeGen<'ctx> {
                 let sa = self.load_string(*a)?;
                 let sb = self.load_string(*b)?;
                 let cc = self.call_rt("atomic_string_eq", &[sa.into(), sb.into()])?;
-                Ok(TypedValue::Bool(cc.try_as_basic_value().left().ok_or("streq failed")?.into_int_value()))
+                Ok(TypedValue::Bool(cc.try_as_basic_value().basic().ok_or("streq failed")?.into_int_value()))
             }
             _ => Err("Cannot compare these types".to_string()),
         }
@@ -911,7 +911,7 @@ impl<'ctx> CodeGen<'ctx> {
                 let sa = self.load_string(*a)?;
                 let sb = self.load_string(*b)?;
                 let cc = self.call_rt("atomic_string_eq", &[sa.into(), sb.into()])?;
-                let eq = cc.try_as_basic_value().left().ok_or("strneq failed")?.into_int_value();
+                let eq = cc.try_as_basic_value().basic().ok_or("strneq failed")?.into_int_value();
                 let one = self.bool_ty().const_int(1, false);
                 Ok(TypedValue::Bool(self.builder.build_xor(eq, one, "strneq").map_err(llvm_err)?))
             }
@@ -939,7 +939,7 @@ impl<'ctx> CodeGen<'ctx> {
                 let sa = self.load_string(*a)?;
                 let sb = self.load_string(*b)?;
                 let cc = self.call_rt("atomic_string_compare", &[sa.into(), sb.into()])?;
-                let cmp = cc.try_as_basic_value().left().ok_or("strcmp failed")?.into_int_value();
+                let cmp = cc.try_as_basic_value().basic().ok_or("strcmp failed")?.into_int_value();
                 Ok(TypedValue::Bool(self.builder.build_int_compare(ip, cmp, self.i64_ty().const_int(0, false), "strcmp").map_err(llvm_err)?))
             }
             _ => Err("Cannot compare these types".to_string()),
@@ -982,7 +982,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let elem_fat = self.to_fat_struct(&value)?;
                         let list_val = self.load_list(ptr)?;
                         let cc = self.call_rt("atomic_list_contains", &[list_val.into(), elem_fat.into()])?;
-                        let result_bv = cc.try_as_basic_value().left().ok_or("list_contains failed")?;
+                        let result_bv = cc.try_as_basic_value().basic().ok_or("list_contains failed")?;
                         let result = result_bv.into_int_value();
                         Ok(TypedValue::Bool(result))
                     }
@@ -991,7 +991,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let list_field = self.builder.build_struct_gep(self.stream_type, ptr, 1, "in_strm_lf").map_err(llvm_err)?;
                         let list_val = self.builder.build_load(self.list_type, list_field, "in_strm_lv").map_err(llvm_err)?;
                         let cc = self.call_rt("atomic_list_contains", &[list_val.into(), elem_fat.into()])?;
-                        let result_bv = cc.try_as_basic_value().left().ok_or("list_contains failed")?;
+                        let result_bv = cc.try_as_basic_value().basic().ok_or("list_contains failed")?;
                         let result = result_bv.into_int_value();
                         Ok(TypedValue::Bool(result))
                     }
@@ -999,7 +999,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let key_fat = self.to_fat_struct(&value)?;
                         let map_val = self.load_list(ptr)?;
                         let cc = self.call_rt("atomic_map_contains", &[map_val.into(), key_fat.into()])?;
-                        let result_bv = cc.try_as_basic_value().left().ok_or("map_contains failed")?;
+                        let result_bv = cc.try_as_basic_value().basic().ok_or("map_contains failed")?;
                         let result = result_bv.into_int_value();
                         Ok(TypedValue::Bool(result))
                     }
@@ -1132,15 +1132,15 @@ impl<'ctx> CodeGen<'ctx> {
     }
 
     /// Coerce an argument value to match the expected parameter type
-    pub(super) fn coerce_arg(&mut self, val: BasicValueEnum<'ctx>, expected_ty: Option<&BasicTypeEnum<'ctx>>) -> Result<BasicValueEnum<'ctx>, String> {
+    pub(super) fn coerce_arg(&mut self, val: BasicValueEnum<'ctx>, expected_ty: Option<&BasicMetadataTypeEnum<'ctx>>) -> Result<BasicValueEnum<'ctx>, String> {
         let expected_ty = match expected_ty {
             Some(t) => t,
             None => return Ok(val),
         };
         let actual_is_ptr = matches!(val, BasicValueEnum::PointerValue(_));
-        let expected_is_i64 = matches!(expected_ty, BasicTypeEnum::IntType(t) if t.get_bit_width() == 64);
-        let expected_is_f64 = matches!(expected_ty, BasicTypeEnum::FloatType(_));
-        let expected_is_ptr = matches!(expected_ty, BasicTypeEnum::PointerType(_));
+        let expected_is_i64 = matches!(expected_ty, BasicMetadataTypeEnum::IntType(t) if t.get_bit_width() == 64);
+        let expected_is_f64 = matches!(expected_ty, BasicMetadataTypeEnum::FloatType(_));
+        let expected_is_ptr = matches!(expected_ty, BasicMetadataTypeEnum::PointerType(_));
         let actual_is_i64 = matches!(val, BasicValueEnum::IntValue(i) if i.get_type().get_bit_width() == 64);
         let actual_is_f64 = matches!(val, BasicValueEnum::FloatValue(_));
 
