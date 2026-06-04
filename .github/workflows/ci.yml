@@ -27,7 +27,7 @@ jobs:
           - name: Windows x64
             os: windows-2022
             target: x86_64-pc-windows-msvc
-            llvm_archive: clang+llvm-21.1.8-x86_64-pc-windows-msvc.tar.xz
+            llvm_archive: LLVM-21.1.8-win64.exe
 
     steps:
       - uses: actions/checkout@v4
@@ -61,11 +61,10 @@ jobs:
         run: |
           $URL = "https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.8/${{ matrix.llvm_archive }}"
           Write-Host "Downloading $URL"
-          curl.exe -fSL --retry 3 --connect-timeout 30 -o C:\llvm.tar.xz "$URL"
-          Write-Host "Extracting..."
-          mkdir -p C:\llvm
-          tar -xf C:\llvm.tar.xz -C C:\llvm --strip-components=1
-          Remove-Item C:\llvm.tar.xz -Force
+          curl.exe -fSL --retry 3 --connect-timeout 30 -o C:\llvm-installer.exe "$URL"
+          Write-Host "Installing LLVM silently to C:\llvm..."
+          Start-Process -Wait -FilePath "C:\llvm-installer.exe" -ArgumentList "/S /D=C:\llvm"
+          Remove-Item C:\llvm-installer.exe -Force
           echo "LLVM_SYS_211_PREFIX=C:\llvm" >> $env:GITHUB_ENV
 
       # ── Build (debug is fine for CI) ──────────────────
