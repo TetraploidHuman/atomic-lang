@@ -18,61 +18,25 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Linux x64
           - name: linux-x64
             os: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
-            suffix: ''
+            arch: x64
+            ext: tar.gz
             llvm_archive: LLVM-21.1.8-Linux-X64.tar.xz
 
-          - name: linux-x64-static
-            os: ubuntu-24.04
-            target: x86_64-unknown-linux-gnu
-            suffix: -static
-            llvm_archive: LLVM-21.1.8-Linux-X64.tar.xz
-
-          - name: linux-x64-dynamic
-            os: ubuntu-24.04
-            target: x86_64-unknown-linux-gnu
-            suffix: -dynamic
-            llvm_archive: LLVM-21.1.8-Linux-X64.tar.xz
-
-          # Linux ARM64
           - name: linux-arm64
             os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
-            suffix: ''
+            arch: arm64
+            ext: tar.gz
             llvm_archive: LLVM-21.1.8-Linux-ARM64.tar.xz
 
-          - name: linux-arm64-static
-            os: ubuntu-24.04-arm
-            target: aarch64-unknown-linux-gnu
-            suffix: -static
-            llvm_archive: LLVM-21.1.8-Linux-ARM64.tar.xz
-
-          - name: linux-arm64-dynamic
-            os: ubuntu-24.04-arm
-            target: aarch64-unknown-linux-gnu
-            suffix: -dynamic
-            llvm_archive: LLVM-21.1.8-Linux-ARM64.tar.xz
-
-          # Windows x64
           - name: windows-x64
             os: windows-2022
             target: x86_64-pc-windows-msvc
-            suffix: ''
-            llvm_archive: LLVM-21.1.8-win64.exe
-
-          - name: windows-x64-static
-            os: windows-2022
-            target: x86_64-pc-windows-msvc
-            suffix: -static
-            llvm_archive: LLVM-21.1.8-win64.exe
-
-          - name: windows-x64-dynamic
-            os: windows-2022
-            target: x86_64-pc-windows-msvc
-            suffix: -dynamic
+            arch: x64
+            ext: zip
             llvm_archive: LLVM-21.1.8-win64.exe
 
     steps:
@@ -134,13 +98,12 @@ jobs:
 
       - name: Package (Linux)
         if: runner.os == 'Linux'
-        id: pkg-linux
+        id: pkg
         shell: bash
         run: |
           set -euo pipefail
           VER="${{ steps.ver.outputs.value }}"
-          ARCH="${{ contains(matrix.target, 'aarch64') && 'arm64' || 'x64' }}"
-          PKG="atomic-${VER}-linux-${ARCH}${{ matrix.suffix }}"
+          PKG="atomic-${VER}-linux-${{ matrix.arch }}"
           DIR="/tmp/${PKG}"
 
           mkdir -p "${DIR}/bin" "${DIR}/examples"
@@ -157,12 +120,12 @@ jobs:
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
-        id: pkg-windows
+        id: pkg
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           $VER = "${{ steps.ver.outputs.value }}"
-          $PKG = "atomic-${VER}-windows-x64${{ matrix.suffix }}"
+          $PKG = "atomic-${VER}-windows-x64"
           $DIR = "C:\${PKG}"
 
           New-Item -ItemType Directory -Force -Path "$DIR\bin" | Out-Null
@@ -181,7 +144,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.name }}
-          path: /tmp/${{ steps.pkg-linux.outputs.file }}
+          path: /tmp/${{ steps.pkg.outputs.file }}
           if-no-files-found: error
 
       - name: Upload artifact (Windows)
@@ -189,7 +152,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.name }}
-          path: C:\${{ steps.pkg-windows.outputs.file }}
+          path: C:\${{ steps.pkg.outputs.file }}
           if-no-files-found: error
 
   release:
@@ -228,25 +191,21 @@ jobs:
           body: |
             ## Atomic Language Compiler v${{ steps.ver.outputs.value }}
 
-            Pre-built binaries for all supported platforms. All packages are
-            statically linked against LLVM — download any variant, the binary
-            is self-contained.
+            Pre-built binaries for all supported platforms.
 
-            ### Linux x64
-            - [atomic-${{ steps.ver.outputs.value }}-linux-x64.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-linux-x64.tar.gz)
-            - [atomic-${{ steps.ver.outputs.value }}-linux-x64-static.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-linux-x64-static.tar.gz)
-            - [atomic-${{ steps.ver.outputs.value }}-linux-x64-dynamic.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-linux-x64-dynamic.tar.gz)
-
-            ### Linux ARM64
-            - [atomic-${{ steps.ver.outputs.value }}-linux-arm64.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-linux-arm64.tar.gz)
-            - [atomic-${{ steps.ver.outputs.value }}-linux-arm64-static.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-linux-arm64-static.tar.gz)
-            - [atomic-${{ steps.ver.outputs.value }}-linux-arm64-dynamic.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-linux-arm64-dynamic.tar.gz)
-
-            ### Windows x64
-            - [atomic-${{ steps.ver.outputs.value }}-windows-x64.zip](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-windows-x64.zip)
-            - [atomic-${{ steps.ver.outputs.value }}-windows-x64-static.zip](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-windows-x64-static.zip)
-            - [atomic-${{ steps.ver.outputs.value }}-windows-x64-dynamic.zip](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-windows-x64-dynamic.zip)
+            | Platform | Package |
+            |----------|---------|
+            | Linux x64 | [atomic-${{ steps.ver.outputs.value }}-linux-x64.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-linux-x64.tar.gz) |
+            | Linux ARM64 | [atomic-${{ steps.ver.outputs.value }}-linux-arm64.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-linux-arm64.tar.gz) |
+            | Windows x64 | [atomic-${{ steps.ver.outputs.value }}-windows-x64.zip](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-windows-x64.zip) |
 
             ### Installation
             Extract the archive and add the `bin/` directory to your PATH.
+
+            ```bash
+            # Linux
+            tar xzf atomic-${{ steps.ver.outputs.value }}-linux-x64.tar.gz
+            export PATH="$PWD/atomic-${{ steps.ver.outputs.value }}-linux-x64/bin:$PATH"
+            atomic run hello.at
+            ```
           generate_release_notes: true
