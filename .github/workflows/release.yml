@@ -14,10 +14,6 @@ on:
         required: false
         default: '21.1.8'
 
-env:
-  LLVM_VERSION: ${{ github.event.inputs.llvm_version || '21.1.8' }}
-  LLVM_TAG: llvmorg-${{ github.event.inputs.llvm_version || '21.1.8' }}
-
 jobs:
   build:
     name: ${{ matrix.name }}
@@ -26,7 +22,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # ── Linux x64 ──────────────────────────────────
+          # Linux x64
           - name: linux-x64-static
             os: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
@@ -39,7 +35,7 @@ jobs:
             link_type: dynamic
             llvm_archive: LLVM-21.1.8-Linux-X64.tar.xz
 
-          # ── Linux ARM64 ────────────────────────────────
+          # Linux ARM64
           - name: linux-arm64-static
             os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
@@ -52,7 +48,7 @@ jobs:
             link_type: dynamic
             llvm_archive: LLVM-21.1.8-Linux-ARM64.tar.xz
 
-          # ── Windows x64 ────────────────────────────────
+          # Windows x64
           - name: windows-x64-static
             os: windows-2022
             target: x86_64-pc-windows-msvc
@@ -66,10 +62,8 @@ jobs:
             llvm_archive: LLVM-21.1.8-win64.exe
 
     steps:
-      # ── Checkout ──────────────────────────────────────
       - uses: actions/checkout@v4
 
-      # ── Determine version ─────────────────────────────
       - name: Set version
         id: ver
         shell: bash
@@ -84,23 +78,20 @@ jobs:
             echo "value=dev" >> "$GITHUB_OUTPUT"
           fi
 
-      # ── Install Rust ──────────────────────────────────
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
 
-      # ── Install Linux deps ────────────────────────────
-      - name: Install system dependencies (Linux)
+      - name: Install system deps (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq libffi-dev zlib1g-dev patchelf
 
-      # ── Download & extract LLVM ───────────────────────
       - name: Setup LLVM (Linux)
         if: runner.os == 'Linux'
         run: |
-          URL="https://github.com/llvm/llvm-project/releases/download/${{ env.LLVM_TAG }}/${{ matrix.llvm_archive }}"
+          URL="https://github.com/llvm/llvm-project/releases/download/llvmorg-${{ github.event.inputs.llvm_version || '21.1.8' }}/${{ matrix.llvm_archive }}"
           echo "Downloading $URL"
           mkdir -p /tmp/llvm
           curl -fSL --retry 3 --connect-timeout 30 "$URL" -o /tmp/llvm.tar.xz
@@ -112,7 +103,8 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $URL = "https://github.com/llvm/llvm-project/releases/download/$env:LLVM_TAG/${{ matrix.llvm_archive }}"
+          $LLVM_VER = "21.1.8"
+          $URL = "https://github.com/llvm/llvm-project/releases/download/llvmorg-${LLVM_VER}/${{ matrix.llvm_archive }}"
           Write-Host "Downloading $URL"
           curl -fSL --retry 3 --connect-timeout 30 -o C:\llvm-installer.exe "$URL"
           Write-Host "Installing LLVM silently to C:\llvm..."
@@ -120,7 +112,6 @@ jobs:
           Remove-Item C:\llvm-installer.exe -Force
           echo "LLVM_SYS_211_PREFIX=C:\llvm" >> $env:GITHUB_ENV
 
-      # ── Configure link type ───────────────────────────
       - name: Force static linking (Linux)
         if: runner.os == 'Linux' && matrix.link_type == 'static'
         run: |
@@ -133,7 +124,6 @@ jobs:
           Remove-Item C:\llvm\bin\LLVM.dll -Force -ErrorAction SilentlyContinue
           Remove-Item C:\llvm\lib\LLVM.lib -Force -ErrorAction SilentlyContinue
 
-      # ── Build ─────────────────────────────────────────
       - name: Build (Linux dynamic)
         if: runner.os == 'Linux' && matrix.link_type == 'dynamic'
         run: |
@@ -151,13 +141,11 @@ jobs:
         run: |
           cargo build --release --target ${{ matrix.target }}
 
-      # ── Test (Linux only, quick smoke test) ────────────
       - name: Smoke test (Linux)
         if: runner.os == 'Linux'
         run: |
           cargo test --release 2>&1 | tail -5
 
-      # ── Package ───────────────────────────────────────
       - name: Package (Linux)
         if: runner.os == 'Linux'
         id: pkg
@@ -191,7 +179,6 @@ jobs:
           cd /tmp
           tar czf "${PKG}.tar.gz" "${PKG}"
           echo "file=${PKG}.tar.gz" >> "$GITHUB_OUTPUT"
-          echo "dir=${DIR}" >> "$GITHUB_OUTPUT"
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
@@ -225,8 +212,7 @@ jobs:
           Compress-Archive -Path "$DIR" -DestinationPath "C:\${archive}"
           echo "file=${archive}" >> $env:GITHUB_OUTPUT
 
-      # ── Upload artifact ────────────────────────────────
-      - name: Upload (Linux)
+      - name: Upload artifact (Linux)
         if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4
         with:
@@ -234,7 +220,7 @@ jobs:
           path: /tmp/${{ steps.pkg.outputs.file }}
           if-no-files-found: error
 
-      - name: Upload (Windows)
+      - name: Upload artifact (Windows)
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
@@ -242,7 +228,6 @@ jobs:
           path: C:\${{ steps.pkg.outputs.file }}
           if-no-files-found: error
 
-  # ── GitHub Release ──────────────────────────────────
   release:
     name: Create GitHub Release
     runs-on: ubuntu-24.04
@@ -262,7 +247,7 @@ jobs:
         with:
           path: /tmp/artifacts
 
-      - name: Flatten artifacts for release
+      - name: Flatten artifacts
         run: |
           mkdir -p /tmp/release-assets
           find /tmp/artifacts -type f \( -name '*.tar.gz' -o -name '*.zip' \) \
@@ -298,9 +283,9 @@ jobs:
 
             ### Installation
             1. Download the appropriate archive for your platform
-            2. Extract it: `tar xzf atomic-*.tar.gz` (Linux) or unzip (Windows)
+            2. Extract: `tar xzf atomic-*.tar.gz` (Linux) or unzip (Windows)
             3. Add the `bin/` directory to your `PATH`
 
-            For the **dynamic** builds, keep the `lib/` directory next to `bin/`
-            — the compiler needs the bundled LLVM shared library at runtime.
+            For **dynamic** builds, keep the `lib/` directory next to `bin/`
+            -- the compiler needs the bundled LLVM shared library at runtime.
           generate_release_notes: true
