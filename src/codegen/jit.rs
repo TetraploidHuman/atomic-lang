@@ -18,7 +18,9 @@ impl<'ctx> CodeGen<'ctx> {
             2 => OptimizationLevel::Default,
             _ => OptimizationLevel::Aggressive,
         };
-        let engine = self.module.create_jit_execution_engine(opt)
+        let engine = self
+            .module
+            .create_jit_execution_engine(opt)
             .map_err(|e| e.to_string())?;
         unsafe {
             let main: inkwell::execution_engine::JitFunction<unsafe extern "C" fn()> =

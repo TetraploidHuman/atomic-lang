@@ -9,7 +9,13 @@ use std::process::Command;
 // Preserve symbols from being optimized out by the linker.
 // These are called by JIT-compiled Atomic code via dlsym.
 #[used]
-static ATOMIC_HTTP_REQUEST_PTR: unsafe extern "C" fn(*const c_char, *const c_char, *const c_char, *const c_char, i64) -> *mut c_char = atomic_http_request;
+static ATOMIC_HTTP_REQUEST_PTR: unsafe extern "C" fn(
+    *const c_char,
+    *const c_char,
+    *const c_char,
+    *const c_char,
+    i64,
+) -> *mut c_char = atomic_http_request;
 #[used]
 static ATOMIC_HTTP_FREE_PTR: unsafe extern "C" fn(*mut c_char) = atomic_http_free;
 
@@ -53,10 +59,12 @@ pub extern "C" fn atomic_http_request(
         .unwrap_or("");
 
     let mut cmd = Command::new("curl");
-    cmd.arg("-s")           // silent mode
-        .arg("-i")          // include response headers
-        .arg("--max-time").arg("120")  // timeout
-        .arg("-X").arg(method)
+    cmd.arg("-s") // silent mode
+        .arg("-i") // include response headers
+        .arg("--max-time")
+        .arg("120") // timeout
+        .arg("-X")
+        .arg(method)
         .arg(url);
 
     // Parse and add headers
@@ -79,7 +87,9 @@ pub extern "C" fn atomic_http_request(
         Ok(output) => {
             let raw = String::from_utf8_lossy(&output.stdout);
             // Parse HTTP response: split headers from body
-            let body_start = raw.find("\r\n\r\n").map(|i| i + 4)
+            let body_start = raw
+                .find("\r\n\r\n")
+                .map(|i| i + 4)
                 .or_else(|| raw.find("\n\n").map(|i| i + 2))
                 .unwrap_or(0);
 
@@ -95,11 +105,15 @@ pub extern "C" fn atomic_http_request(
                 .unwrap_or(0);
 
             let result = format!("{}\n{}", status_code, response_body.trim_end());
-            CString::new(result).unwrap_or_else(|_| CString::new("0\nEncoding error").unwrap()).into_raw()
+            CString::new(result)
+                .unwrap_or_else(|_| CString::new("0\nEncoding error").unwrap())
+                .into_raw()
         }
         Err(e) => {
             let err = format!("0\nHTTP request failed: {}", e);
-            CString::new(err).unwrap_or_else(|_| CString::new("0\nError").unwrap()).into_raw()
+            CString::new(err)
+                .unwrap_or_else(|_| CString::new("0\nError").unwrap())
+                .into_raw()
         }
     }
 }

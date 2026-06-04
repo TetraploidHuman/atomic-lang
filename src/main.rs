@@ -7,11 +7,11 @@ mod lexer;
 mod parser;
 mod typecheck;
 
-use ast::*;
 use ariadne::{Color, Label, Report, ReportKind, Source};
+use ast::*;
+use clap::{Parser as ClapParser, Subcommand};
 use config::ProjectConfig;
 use error::CompilerError;
-use clap::{Parser as ClapParser, Subcommand};
 use inkwell::context::Context;
 use lexer::Span;
 use std::fs;
@@ -78,7 +78,14 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Run { file, opt, check, emit, explain, target } => {
+        Commands::Run {
+            file,
+            opt,
+            check,
+            emit,
+            explain,
+            target,
+        } => {
             if let Err(e) = run_file(&file, opt, check, emit, explain, &target) {
                 if let Ok(source) = fs::read_to_string(&file) {
                     report_error(&source, &file.to_string_lossy(), &e);
@@ -88,7 +95,13 @@ fn main() {
                 std::process::exit(1);
             }
         }
-        Commands::Build { file, output, opt, emit, target } => {
+        Commands::Build {
+            file,
+            output,
+            opt,
+            emit,
+            target,
+        } => {
             if let Err(e) = build_file(&file, output, opt, emit, &target) {
                 if let Ok(source) = fs::read_to_string(&file) {
                     report_error(&source, &file.to_string_lossy(), &e);
@@ -98,24 +111,26 @@ fn main() {
                 std::process::exit(1);
             }
         }
-        Commands::Check { file, explain } => {
-            match check_file(&file, explain) {
-                Ok(()) => {
-                    println!("Type checking passed. No errors found.");
-                }
-                Err(errors) => {
-                    if let Ok(source) = fs::read_to_string(&file) {
-                        let msg = errors.iter().map(|e| e.to_string()).collect::<Vec<_>>().join("\n");
-                        report_error(&source, &file.to_string_lossy(), &msg);
-                    } else {
-                        for e in &errors {
-                            eprintln!("Error: {}", e);
-                        }
-                    }
-                    std::process::exit(1);
-                }
+        Commands::Check { file, explain } => match check_file(&file, explain) {
+            Ok(()) => {
+                println!("Type checking passed. No errors found.");
             }
-        }
+            Err(errors) => {
+                if let Ok(source) = fs::read_to_string(&file) {
+                    let msg = errors
+                        .iter()
+                        .map(|e| e.to_string())
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    report_error(&source, &file.to_string_lossy(), &msg);
+                } else {
+                    for e in &errors {
+                        eprintln!("Error: {}", e);
+                    }
+                }
+                std::process::exit(1);
+            }
+        },
     }
 }
 
@@ -179,7 +194,13 @@ fn report_error(source: &str, path: &str, error: &str) {
 
         // Check if the next line is a help line
         if i + 1 < lines.len() && lines[i + 1].trim().starts_with("help: ") {
-            help_text = Some(lines[i + 1].trim().strip_prefix("help: ").unwrap_or("").to_string());
+            help_text = Some(
+                lines[i + 1]
+                    .trim()
+                    .strip_prefix("help: ")
+                    .unwrap_or("")
+                    .to_string(),
+            );
             i += 1;
         }
 
@@ -197,7 +218,8 @@ fn report_error(source: &str, path: &str, error: &str) {
                 report = report.with_help(help.clone());
             }
 
-            report.finish()
+            report
+                .finish()
                 .eprint((path, Source::from(source)))
                 .unwrap_or_else(|_| eprintln!("Error: {}", line));
             has_ariadne_output = true;
@@ -214,7 +236,11 @@ fn report_error(source: &str, path: &str, error: &str) {
     }
 
     // If no ariadne output and no formatted output, fallback
-    if !has_ariadne_output && error.lines().all(|l| !l.starts_with("Error at line") && !l.starts_with("Parse error at line")) {
+    if !has_ariadne_output
+        && error
+            .lines()
+            .all(|l| !l.starts_with("Error at line") && !l.starts_with("Parse error at line"))
+    {
         for line in error.lines() {
             if !line.trim().starts_with("help: ") {
                 eprintln!("\x1b[1;31merror:\x1b[0m {}", line);
@@ -225,9 +251,18 @@ fn report_error(source: &str, path: &str, error: &str) {
 
 /// Build built-in enum definitions that are injected if the user doesn't define them
 fn builtin_enums(program: &Program) -> Vec<Stmt> {
-    let has_option = program.stmts.iter().any(|s| matches!(s, Stmt::Enum { name, .. } if name == "Option"));
-    let has_result = program.stmts.iter().any(|s| matches!(s, Stmt::Enum { name, .. } if name == "Result"));
-    let has_timeout_error = program.stmts.iter().any(|s| matches!(s, Stmt::Enum { name, .. } if name == "TimeoutError"));
+    let has_option = program
+        .stmts
+        .iter()
+        .any(|s| matches!(s, Stmt::Enum { name, .. } if name == "Option"));
+    let has_result = program
+        .stmts
+        .iter()
+        .any(|s| matches!(s, Stmt::Enum { name, .. } if name == "Result"));
+    let has_timeout_error = program
+        .stmts
+        .iter()
+        .any(|s| matches!(s, Stmt::Enum { name, .. } if name == "TimeoutError"));
 
     let mut builtins = Vec::new();
     if !has_option {
@@ -239,7 +274,10 @@ fn builtin_enums(program: &Program) -> Vec<Stmt> {
                     name: "Some".into(),
                     params: vec![EnumVariantParam::Positional(Type::Named("T".into()))],
                 },
-                EnumVariant { name: "None".into(), params: vec![] },
+                EnumVariant {
+                    name: "None".into(),
+                    params: vec![],
+                },
             ],
             span: lexer::Span::default(),
         });
@@ -265,9 +303,10 @@ fn builtin_enums(program: &Program) -> Vec<Stmt> {
         builtins.push(Stmt::Enum {
             name: "TimeoutError".into(),
             type_params: vec![],
-            variants: vec![
-                EnumVariant { name: "Timeout".into(), params: vec![] },
-            ],
+            variants: vec![EnumVariant {
+                name: "Timeout".into(),
+                params: vec![],
+            }],
             span: lexer::Span::default(),
         });
     }
@@ -276,9 +315,18 @@ fn builtin_enums(program: &Program) -> Vec<Stmt> {
 
 /// Register builtin struct types (Date, DateTime, Random)
 fn builtin_types(program: &Program) -> Vec<Stmt> {
-    let has_date = program.stmts.iter().any(|s| matches!(s, Stmt::TypeAlias { name, .. } if name == "Date"));
-    let has_datetime = program.stmts.iter().any(|s| matches!(s, Stmt::TypeAlias { name, .. } if name == "DateTime"));
-    let has_random = program.stmts.iter().any(|s| matches!(s, Stmt::TypeAlias { name, .. } if name == "Random"));
+    let has_date = program
+        .stmts
+        .iter()
+        .any(|s| matches!(s, Stmt::TypeAlias { name, .. } if name == "Date"));
+    let has_datetime = program
+        .stmts
+        .iter()
+        .any(|s| matches!(s, Stmt::TypeAlias { name, .. } if name == "DateTime"));
+    let has_random = program
+        .stmts
+        .iter()
+        .any(|s| matches!(s, Stmt::TypeAlias { name, .. } if name == "Random"));
 
     let mut builtins = Vec::new();
     if !has_date {
@@ -312,9 +360,7 @@ fn builtin_types(program: &Program) -> Vec<Stmt> {
         builtins.push(Stmt::TypeAlias {
             name: "Random".into(),
             type_params: vec![],
-            definition: Type::Struct(vec![
-                ("seed".into(), Type::Named("Int".into())),
-            ]),
+            definition: Type::Struct(vec![("seed".into(), Type::Named("Int".into()))]),
             span: lexer::Span::default(),
         });
     }
@@ -333,13 +379,20 @@ fn load_module(module_name: &str, search_dirs: &[PathBuf]) -> Result<Vec<Stmt>, 
                 let mut lexer = lexer::Lexer::new(&source);
                 let tokens = lexer.tokenize();
                 let mut parser = parser::Parser::new(tokens);
-                let program = parser.parse_program()
-                    .map_err(|e| format!("Parse error in {} at line {}, col {}: {}", file_name, e.line, e.col, e.message))?;
+                let program = parser.parse_program().map_err(|e| {
+                    format!(
+                        "Parse error in {} at line {}, col {}: {}",
+                        file_name, e.line, e.col, e.message
+                    )
+                })?;
                 return Ok(program.stmts);
             }
         }
     }
-    Err(format!("Module '{}' not found (looked for {}.atom or {}.at)", module_name, module_name, module_name))
+    Err(format!(
+        "Module '{}' not found (looked for {}.atom or {}.at)",
+        module_name, module_name, module_name
+    ))
 }
 
 /// Resolve import statements by loading module files and adding their statements
@@ -348,7 +401,13 @@ fn resolve_imports(program: &Program, search_dirs: &[PathBuf]) -> Result<Vec<Stm
     let mut loaded: std::collections::HashSet<String> = std::collections::HashSet::new();
 
     for stmt in &program.stmts {
-        if let Stmt::Import { module, items, alias, .. } = stmt {
+        if let Stmt::Import {
+            module,
+            items,
+            alias,
+            ..
+        } = stmt
+        {
             if loaded.contains(module) {
                 continue;
             }
@@ -358,19 +417,32 @@ fn resolve_imports(program: &Program, search_dirs: &[PathBuf]) -> Result<Vec<Stm
             let prefix = alias.as_ref().unwrap_or(module);
 
             // Check if the module has an explicit Module statement with export list
-            let exported: Option<std::collections::HashSet<String>> = module_stmts.iter()
-                .find_map(|s| if let Stmt::Module { exports, .. } = s {
-                    Some(exports.iter().filter_map(|e| match e {
-                        ExportItem::Function(name) | ExportItem::Constant(name) | ExportItem::Type(name) => Some(name.clone()),
-                    }).collect())
-                } else { None });
+            let exported: Option<std::collections::HashSet<String>> =
+                module_stmts.iter().find_map(|s| {
+                    if let Stmt::Module { exports, .. } = s {
+                        Some(
+                            exports
+                                .iter()
+                                .filter_map(|e| match e {
+                                    ExportItem::Function(name)
+                                    | ExportItem::Constant(name)
+                                    | ExportItem::Type(name) => Some(name.clone()),
+                                })
+                                .collect(),
+                        )
+                    } else {
+                        None
+                    }
+                });
 
             // Collect statements to import (from module body or top-level)
             let mut stmts_to_check: Vec<&Stmt> = Vec::new();
             for m_stmt in &module_stmts {
                 match m_stmt {
                     Stmt::Module { body, .. } => {
-                        for b in body { stmts_to_check.push(b); }
+                        for b in body {
+                            stmts_to_check.push(b);
+                        }
                     }
                     _ => stmts_to_check.push(m_stmt),
                 }
@@ -378,7 +450,15 @@ fn resolve_imports(program: &Program, search_dirs: &[PathBuf]) -> Result<Vec<Stm
 
             for m_stmt in &stmts_to_check {
                 match m_stmt {
-                    Stmt::Fun { name, params, return_type, body, is_single_expr, type_params, .. } => {
+                    Stmt::Fun {
+                        name,
+                        params,
+                        return_type,
+                        body,
+                        is_single_expr,
+                        type_params,
+                        ..
+                    } => {
                         // Selective import: bare names. Wildcard: prefixed.
                         let imported_name = if items.is_some() {
                             name.clone()
@@ -386,7 +466,8 @@ fn resolve_imports(program: &Program, search_dirs: &[PathBuf]) -> Result<Vec<Stm
                             format!("{}_{}", prefix, name)
                         };
                         // Filter by: import items list (if specified) AND module exports (if specified)
-                        let item_filter = items.is_none() || items.as_ref().map_or(false, |its| its.contains(name));
+                        let item_filter = items.is_none()
+                            || items.as_ref().map_or(false, |its| its.contains(name));
                         let export_filter = exported.as_ref().map_or(true, |e| e.contains(name));
                         let should_import = item_filter || (items.is_none() && export_filter);
                         if should_import {
@@ -401,8 +482,14 @@ fn resolve_imports(program: &Program, search_dirs: &[PathBuf]) -> Result<Vec<Stm
                             });
                         }
                     }
-                    Stmt::Const { name, type_ann, value, .. } => {
-                        let item_filter = items.is_none() || items.as_ref().map_or(false, |its| its.contains(name));
+                    Stmt::Const {
+                        name,
+                        type_ann,
+                        value,
+                        ..
+                    } => {
+                        let item_filter = items.is_none()
+                            || items.as_ref().map_or(false, |its| its.contains(name));
                         let export_filter = exported.as_ref().map_or(true, |e| e.contains(name));
                         if item_filter || (items.is_none() && export_filter) {
                             let imported_name = if items.is_some() {
@@ -418,8 +505,14 @@ fn resolve_imports(program: &Program, search_dirs: &[PathBuf]) -> Result<Vec<Stm
                             });
                         }
                     }
-                    Stmt::TypeAlias { name, type_params, definition, .. } => {
-                        let item_filter = items.is_none() || items.as_ref().map_or(false, |its| its.contains(name));
+                    Stmt::TypeAlias {
+                        name,
+                        type_params,
+                        definition,
+                        ..
+                    } => {
+                        let item_filter = items.is_none()
+                            || items.as_ref().map_or(false, |its| its.contains(name));
                         let export_filter = exported.as_ref().map_or(true, |e| e.contains(name));
                         if item_filter || (items.is_none() && export_filter) {
                             extra_stmts.push(Stmt::TypeAlias {
@@ -430,8 +523,14 @@ fn resolve_imports(program: &Program, search_dirs: &[PathBuf]) -> Result<Vec<Stm
                             });
                         }
                     }
-                    Stmt::Enum { name, type_params, variants, .. } => {
-                        let item_filter = items.is_none() || items.as_ref().map_or(false, |its| its.contains(name));
+                    Stmt::Enum {
+                        name,
+                        type_params,
+                        variants,
+                        ..
+                    } => {
+                        let item_filter = items.is_none()
+                            || items.as_ref().map_or(false, |its| its.contains(name));
                         let export_filter = exported.as_ref().map_or(true, |e| e.contains(name));
                         if item_filter || (items.is_none() && export_filter) {
                             extra_stmts.push(Stmt::Enum {
@@ -442,9 +541,20 @@ fn resolve_imports(program: &Program, search_dirs: &[PathBuf]) -> Result<Vec<Stm
                             });
                         }
                     }
-                    Stmt::Extension { type_name, methods, .. } => {
+                    Stmt::Extension {
+                        type_name, methods, ..
+                    } => {
                         for method in methods {
-                            if let Stmt::Fun { name, params, return_type, body, is_single_expr, type_params, .. } = method {
+                            if let Stmt::Fun {
+                                name,
+                                params,
+                                return_type,
+                                body,
+                                is_single_expr,
+                                type_params,
+                                ..
+                            } = method
+                            {
                                 let fn_name = format!("{}_{}", type_name, name);
                                 extra_stmts.push(Stmt::Fun {
                                     name: fn_name,
@@ -474,7 +584,13 @@ fn transform_module_access(program: &mut Program) {
     // Collect module prefixes from Import statements
     let mut module_prefixes: HashSet<String> = HashSet::new();
     for stmt in &program.stmts {
-        if let Stmt::Import { module, items, alias, .. } = stmt {
+        if let Stmt::Import {
+            module,
+            items,
+            alias,
+            ..
+        } = stmt
+        {
             // Only transform for full-module imports (no items, no alias)
             if items.is_none() {
                 let prefix = alias.as_ref().unwrap_or(module);
@@ -501,10 +617,18 @@ fn transform_module_access(program: &mut Program) {
 
         // Recurse into sub-expressions
         match expr {
-            Expr::Call { ref mut func, ref mut args, ref mut trailing_lambda } => {
+            Expr::Call {
+                ref mut func,
+                ref mut args,
+                ref mut trailing_lambda,
+            } => {
                 transform_expr(func, prefixes);
-                for arg in args.iter_mut() { transform_expr(arg, prefixes); }
-                if let Some(ref mut lambda) = trailing_lambda { transform_expr(lambda, prefixes); }
+                for arg in args.iter_mut() {
+                    transform_expr(arg, prefixes);
+                }
+                if let Some(ref mut lambda) = trailing_lambda {
+                    transform_expr(lambda, prefixes);
+                }
             }
             Expr::Binary(ref mut lhs, _, ref mut rhs) => {
                 transform_expr(lhs, prefixes);
@@ -525,10 +649,14 @@ fn transform_module_access(program: &mut Program) {
                 transform_expr(end, prefixes);
             }
             Expr::Tuple(ref mut elements) => {
-                for (_, e) in elements.iter_mut() { transform_expr(e, prefixes); }
+                for (_, e) in elements.iter_mut() {
+                    transform_expr(e, prefixes);
+                }
             }
             Expr::StructLiteral(ref mut fields) => {
-                for (_, e) in fields.iter_mut() { transform_expr(e, prefixes); }
+                for (_, e) in fields.iter_mut() {
+                    transform_expr(e, prefixes);
+                }
             }
             Expr::MapLiteral(ref mut entries) => {
                 for (k, v) in entries.iter_mut() {
@@ -537,10 +665,14 @@ fn transform_module_access(program: &mut Program) {
                 }
             }
             Expr::SetLiteral(ref mut items) => {
-                for item in items.iter_mut() { transform_expr(item, prefixes); }
+                for item in items.iter_mut() {
+                    transform_expr(item, prefixes);
+                }
             }
             Expr::Block(ref mut stmts) => {
-                for s in stmts.iter_mut() { transform_stmt(s, prefixes); }
+                for s in stmts.iter_mut() {
+                    transform_stmt(s, prefixes);
+                }
             }
             Expr::Lambda { ref mut body, .. } => {
                 transform_expr(body, prefixes);
@@ -548,21 +680,32 @@ fn transform_module_access(program: &mut Program) {
             Expr::When(ref mut w) => {
                 // w is Box<When>
                 match &mut w.kind {
-                    WhenKind::OneLine { ref mut condition, ref mut then_expr, ref mut else_expr } => {
+                    WhenKind::OneLine {
+                        ref mut condition,
+                        ref mut then_expr,
+                        ref mut else_expr,
+                    } => {
                         transform_expr(condition, prefixes);
                         transform_expr(then_expr, prefixes);
                         transform_expr(else_expr, prefixes);
                     }
-                    WhenKind::ValueMatch { ref mut value, ref mut arms } => {
+                    WhenKind::ValueMatch {
+                        ref mut value,
+                        ref mut arms,
+                    } => {
                         transform_expr(value, prefixes);
                         for arm in arms.iter_mut() {
-                            if let Some(ref mut g) = arm.guard { transform_expr(g, prefixes); }
+                            if let Some(ref mut g) = arm.guard {
+                                transform_expr(g, prefixes);
+                            }
                             transform_expr(&mut arm.body, prefixes);
                         }
                     }
                     WhenKind::ConditionChain { ref mut arms } => {
                         for arm in arms.iter_mut() {
-                            if let Some(ref mut g) = arm.guard { transform_expr(g, prefixes); }
+                            if let Some(ref mut g) = arm.guard {
+                                transform_expr(g, prefixes);
+                            }
                             transform_expr(&mut arm.body, prefixes);
                         }
                     }
@@ -571,23 +714,40 @@ fn transform_module_access(program: &mut Program) {
             Expr::For(ref mut fr) => {
                 // fr is Box<For>
                 match &mut fr.kind {
-                    ForKind::Iterate { ref mut iterable, ref mut body, .. } => {
+                    ForKind::Iterate {
+                        ref mut iterable,
+                        ref mut body,
+                        ..
+                    } => {
                         transform_expr(iterable, prefixes);
                         transform_expr(body, prefixes);
                     }
-                    ForKind::IterateWithIndex { ref mut iterable, ref mut body, .. } => {
+                    ForKind::IterateWithIndex {
+                        ref mut iterable,
+                        ref mut body,
+                        ..
+                    } => {
                         transform_expr(iterable, prefixes);
                         transform_expr(body, prefixes);
                     }
-                    ForKind::Condition { ref mut condition, ref mut body } => {
+                    ForKind::Condition {
+                        ref mut condition,
+                        ref mut body,
+                    } => {
                         transform_expr(condition, prefixes);
                         transform_expr(body, prefixes);
                     }
                     ForKind::Infinite { ref mut body } => {
                         transform_expr(body, prefixes);
                     }
-                    ForKind::NestedIterate { ref mut bindings, ref mut body, .. } => {
-                        for (_, e) in bindings.iter_mut() { transform_expr(e, prefixes); }
+                    ForKind::NestedIterate {
+                        ref mut bindings,
+                        ref mut body,
+                        ..
+                    } => {
+                        for (_, e) in bindings.iter_mut() {
+                            transform_expr(e, prefixes);
+                        }
                         transform_expr(body, prefixes);
                     }
                 }
@@ -595,11 +755,20 @@ fn transform_module_access(program: &mut Program) {
             Expr::SafeFieldAccess(ref mut base, _) => {
                 transform_expr(base, prefixes);
             }
-            Expr::SafeCall { ref mut receiver, ref mut args } => {
+            Expr::SafeCall {
+                ref mut receiver,
+                ref mut args,
+            } => {
                 transform_expr(receiver, prefixes);
-                for arg in args.iter_mut() { transform_expr(arg, prefixes); }
+                for arg in args.iter_mut() {
+                    transform_expr(arg, prefixes);
+                }
             }
-            Expr::Assign { ref mut target, ref mut value, .. } => {
+            Expr::Assign {
+                ref mut target,
+                ref mut value,
+                ..
+            } => {
                 transform_expr(target, prefixes);
                 transform_expr(value, prefixes);
             }
@@ -638,10 +807,14 @@ fn transform_module_access(program: &mut Program) {
                 transform_expr(expr, prefixes);
             }
             Stmt::Return { ref mut value, .. } => {
-                if let Some(ref mut e) = value { transform_expr(e, prefixes); }
+                if let Some(ref mut e) = value {
+                    transform_expr(e, prefixes);
+                }
             }
             Stmt::Module { ref mut body, .. } => {
-                for s in body.iter_mut() { transform_stmt(s, prefixes); }
+                for s in body.iter_mut() {
+                    transform_stmt(s, prefixes);
+                }
             }
             Stmt::Export { ref mut stmt, .. } => {
                 transform_stmt(stmt, prefixes);
@@ -649,11 +822,20 @@ fn transform_module_access(program: &mut Program) {
             Stmt::Destructure { ref mut value, .. } => {
                 transform_expr(value, prefixes);
             }
-            Stmt::Extension { ref mut methods, .. } => {
-                for m in methods.iter_mut() { transform_stmt(m, prefixes); }
+            Stmt::Extension {
+                ref mut methods, ..
+            } => {
+                for m in methods.iter_mut() {
+                    transform_stmt(m, prefixes);
+                }
             }
-            Stmt::External { .. } | Stmt::ExternalType { .. } | Stmt::Enum { .. } | Stmt::TypeAlias { .. }
-            | Stmt::Import { .. } | Stmt::Break { .. } | Stmt::Continue { .. } => {}
+            Stmt::External { .. }
+            | Stmt::ExternalType { .. }
+            | Stmt::Enum { .. }
+            | Stmt::TypeAlias { .. }
+            | Stmt::Import { .. }
+            | Stmt::Break { .. }
+            | Stmt::Continue { .. } => {}
         }
     }
 
@@ -678,8 +860,12 @@ fn load_stdlib() -> Result<Vec<Stmt>, String> {
             let mut lexer = lexer::Lexer::new(&source);
             let tokens = lexer.tokenize();
             let mut parser = parser::Parser::new(tokens);
-            let program = parser.parse_program()
-                .map_err(|e| format!("Parse error in {} at line {}, col {}: {}", file_name, e.line, e.col, e.message))?;
+            let program = parser.parse_program().map_err(|e| {
+                format!(
+                    "Parse error in {} at line {}, col {}: {}",
+                    file_name, e.line, e.col, e.message
+                )
+            })?;
             stmts.extend(program.stmts);
         }
     }
@@ -697,23 +883,37 @@ fn register_types(program: &Program) -> TypeRegistry {
 
 /// Load, resolve imports, register types, and type-check a program.
 /// Returns the fully-resolved Program and TypeRegistry on success.
-fn load_program(path: &PathBuf, explain: bool) -> Result<(Program, TypeRegistry), Vec<CompilerError>> {
-    let source = fs::read_to_string(path)
-        .map_err(|e| vec![CompilerError::new(format!("Cannot read '{}': {}", path.display(), e))])?;
+fn load_program(
+    path: &PathBuf,
+    explain: bool,
+) -> Result<(Program, TypeRegistry), Vec<CompilerError>> {
+    let source = fs::read_to_string(path).map_err(|e| {
+        vec![CompilerError::new(format!(
+            "Cannot read '{}': {}",
+            path.display(),
+            e
+        ))]
+    })?;
 
     let mut lexer = lexer::Lexer::new(&source);
     let tokens = lexer.tokenize();
 
     let mut parser = parser::Parser::new(tokens);
-    let mut program = parser.parse_program()
-        .map_err(|e| vec![CompilerError::new(format!("Parse error at line {}, col {}: {}", e.line, e.col, e.message))])?;
+    let mut program = parser.parse_program().map_err(|e| {
+        vec![CompilerError::new(format!(
+            "Parse error at line {}, col {}: {}",
+            e.line, e.col, e.message
+        ))]
+    })?;
 
     let builtins = builtin_enums(&program);
     let builtins_types = builtin_types(&program);
-    let stdlib = load_stdlib()
-        .map_err(|e| vec![CompilerError::new(e)])?;
+    let stdlib = load_stdlib().map_err(|e| vec![CompilerError::new(e)])?;
 
-    let mod_dir = path.parent().unwrap_or(std::path::Path::new(".")).to_path_buf();
+    let mod_dir = path
+        .parent()
+        .unwrap_or(std::path::Path::new("."))
+        .to_path_buf();
     let lib_dir = std::env::current_dir()
         .map_err(|e| vec![CompilerError::new(format!("Cannot get current dir: {}", e))])?
         .join("lib");
@@ -765,22 +965,42 @@ fn load_program(path: &PathBuf, explain: bool) -> Result<(Program, TypeRegistry)
     Ok((program, registry))
 }
 
-fn run_file(path: &PathBuf, opt: u8, check: bool, emit: Option<String>, explain: bool, target: &str) -> Result<(), String> {
+fn run_file(
+    path: &PathBuf,
+    opt: u8,
+    check: bool,
+    emit: Option<String>,
+    explain: bool,
+    target: &str,
+) -> Result<(), String> {
     let config = ProjectConfig::find_and_load(path);
-    let opt = config.as_ref()
+    let opt = config
+        .as_ref()
         .map(|c| c.effective_opt_level(opt))
         .unwrap_or(opt);
 
-    let (program, registry) = load_program(path, explain)
-        .map_err(|errors| errors.iter().map(|e| e.to_string()).collect::<Vec<_>>().join("\n"))?;
+    let (program, registry) = load_program(path, explain).map_err(|errors| {
+        errors
+            .iter()
+            .map(|e| e.to_string())
+            .collect::<Vec<_>>()
+            .join("\n")
+    })?;
 
     if check {
-        println!("Type checking passed for '{}'. No errors found.", path.display());
+        println!(
+            "Type checking passed for '{}'. No errors found.",
+            path.display()
+        );
         return Ok(());
     }
 
     let context = Context::create();
-    let target_opt = if target == "native" { None } else { Some(target.to_string()) };
+    let target_opt = if target == "native" {
+        None
+    } else {
+        Some(target.to_string())
+    };
     let mut cg = codegen::CodeGen::new(&context, "main", registry, target_opt);
     cg.set_opt_level(opt);
     cg.compile(&program)?;
@@ -813,17 +1033,33 @@ fn run_file(path: &PathBuf, opt: u8, check: bool, emit: Option<String>, explain:
     Ok(())
 }
 
-fn build_file(path: &PathBuf, output: Option<PathBuf>, opt: u8, emit: Option<String>, target: &str) -> Result<(), String> {
+fn build_file(
+    path: &PathBuf,
+    output: Option<PathBuf>,
+    opt: u8,
+    emit: Option<String>,
+    target: &str,
+) -> Result<(), String> {
     let config = ProjectConfig::find_and_load(path);
-    let opt = config.as_ref()
+    let opt = config
+        .as_ref()
         .map(|c| c.effective_opt_level(opt))
         .unwrap_or(opt);
 
-    let (program, registry) = load_program(path, false)
-        .map_err(|errors| errors.iter().map(|e| e.to_string()).collect::<Vec<_>>().join("\n"))?;
+    let (program, registry) = load_program(path, false).map_err(|errors| {
+        errors
+            .iter()
+            .map(|e| e.to_string())
+            .collect::<Vec<_>>()
+            .join("\n")
+    })?;
 
     let context = Context::create();
-    let target_opt = if target == "native" { None } else { Some(target.to_string()) };
+    let target_opt = if target == "native" {
+        None
+    } else {
+        Some(target.to_string())
+    };
     let mut cg = codegen::CodeGen::new(&context, "main", registry, target_opt);
     cg.set_opt_level(opt);
     cg.compile(&program)?;
@@ -841,7 +1077,12 @@ fn build_file(path: &PathBuf, output: Option<PathBuf>, opt: u8, emit: Option<Str
     Ok(())
 }
 
-fn emit_output(cg: &codegen::CodeGen, src_path: &Path, fmt: &str, target: &str) -> Result<(), String> {
+fn emit_output(
+    cg: &codegen::CodeGen,
+    src_path: &Path,
+    fmt: &str,
+    target: &str,
+) -> Result<(), String> {
     match fmt {
         "ir" => {
             println!("=== LLVM IR ===");
@@ -879,7 +1120,8 @@ fn emit_output(cg: &codegen::CodeGen, src_path: &Path, fmt: &str, target: &str) 
                 _ => "cc",
             };
             let status = std::process::Command::new(linker)
-                .arg("-o").arg(&exe_path)
+                .arg("-o")
+                .arg(&exe_path)
                 .arg(&obj_path)
                 .status()
                 .map_err(|e| format!("Failed to invoke linker '{}': {}", linker, e))?;
@@ -889,7 +1131,12 @@ fn emit_output(cg: &codegen::CodeGen, src_path: &Path, fmt: &str, target: &str) 
             let _ = std::fs::remove_file(&obj_path);
             println!("Executable written to: {}", exe_path.display());
         }
-        other => return Err(format!("Unknown emit format: {}. Supported: ir, bc, asm, obj, exe", other)),
+        other => {
+            return Err(format!(
+                "Unknown emit format: {}. Supported: ir, bc, asm, obj, exe",
+                other
+            ))
+        }
     }
     Ok(())
 }

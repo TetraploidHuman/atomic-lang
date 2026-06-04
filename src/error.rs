@@ -31,7 +31,11 @@ impl CompilerError {
 impl std::fmt::Display for CompilerError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(span) = &self.span {
-            write!(f, "Error at line {}, col {}: {}", span.line, span.col, self.message)?;
+            write!(
+                f,
+                "Error at line {}, col {}: {}",
+                span.line, span.col, self.message
+            )?;
         } else {
             write!(f, "Error: {}", self.message)?;
         }

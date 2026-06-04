@@ -1,18 +1,22 @@
 // Submodule: pattern
 
 use crate::ast::*;
-use inkwell::values::IntValue;
 use inkwell::types::BasicTypeEnum;
-use inkwell::IntPredicate;
+use inkwell::values::IntValue;
 use inkwell::FloatPredicate;
+use inkwell::IntPredicate;
 use std::collections::HashMap;
 
-use super::{CodeGen, TypedValue, Scope, llvm_err};
+use super::{llvm_err, CodeGen, Scope, TypedValue};
 
 impl<'ctx> CodeGen<'ctx> {
     pub(super) fn compile_when(&mut self, w: &When) -> Result<TypedValue<'ctx>, String> {
         match &w.kind {
-            WhenKind::OneLine { condition, then_expr, else_expr } => {
+            WhenKind::OneLine {
+                condition,
+                then_expr,
+                else_expr,
+            } => {
                 let c = self.compile_expr(condition)?;
                 let c_bool = match c {
                     TypedValue::Bool(b) => b,
@@ -20,12 +24,8 @@ impl<'ctx> CodeGen<'ctx> {
                 };
                 self.compile_when_branch_lazy(c_bool, then_expr, else_expr)
             }
-            WhenKind::ValueMatch { value, arms } => {
-                self.compile_value_match(value, arms)
-            }
-            WhenKind::ConditionChain { arms } => {
-                self.compile_condition_chain(arms)
-            }
+            WhenKind::ValueMatch { value, arms } => self.compile_value_match(value, arms),
+            WhenKind::ConditionChain { arms } => self.compile_condition_chain(arms),
         }
     }
 
@@ -38,7 +38,9 @@ impl<'ctx> CodeGen<'ctx> {
                     TypedValue::Bool(b) => Ok(b),
                     TypedValue::Int(i) => {
                         let zero = self.i64_ty().const_int(0, false);
-                        Ok(self.builder.build_int_compare(IntPredicate::NE, i, zero, "guard_truthy")
+                        Ok(self
+                            .builder
+                            .build_int_compare(IntPredicate::NE, i, zero, "guard_truthy")
                             .map_err(llvm_err)?)
                     }
                     _ => {
@@ -51,12 +53,17 @@ impl<'ctx> CodeGen<'ctx> {
         }
     }
 
-    pub(super) fn compile_condition_chain(&mut self, arms: &[WhenArm]) -> Result<TypedValue<'ctx>, String> {
+    pub(super) fn compile_condition_chain(
+        &mut self,
+        arms: &[WhenArm],
+    ) -> Result<TypedValue<'ctx>, String> {
         if arms.is_empty() {
             return Ok(TypedValue::Unit);
         }
 
-        let current_fn = self.builder.get_insert_block()
+        let current_fn = self
+            .builder
+            .get_insert_block()
             .and_then(|b| b.get_parent())
             .ok_or("Cannot compile when outside function")?;
 
@@ -70,10 +77,15 @@ impl<'ctx> CodeGen<'ctx> {
         let entry = current_fn.get_first_basic_block().unwrap();
         let saved_pos = self.builder.get_insert_block();
         match entry.get_first_instruction() {
-            Some(instr) => { let _ = self.builder.position_before(&instr); }
+            Some(instr) => {
+                let _ = self.builder.position_before(&instr);
+            }
             None => self.builder.position_at_end(entry),
         }
-        let result_alloca = self.builder.build_alloca(result_ty, "chain_result").map_err(llvm_err)?;
+        let result_alloca = self
+            .builder
+            .build_alloca(result_ty, "chain_result")
+            .map_err(llvm_err)?;
         if let Some(block) = saved_pos {
             self.builder.position_at_end(block);
         }
@@ -93,21 +105,32 @@ impl<'ctx> CodeGen<'ctx> {
                 self.scope = Scope::with_parent(saved_scope);
                 self.bind_pattern_vars(&arm.pattern, None, None)?;
                 let guard_matches = self.compile_guard(&arm.guard)?;
-                let combined = self.builder.build_and(matches, guard_matches, "guard_and").map_err(llvm_err)?;
+                let combined = self
+                    .builder
+                    .build_and(matches, guard_matches, "guard_and")
+                    .map_err(llvm_err)?;
                 let mut parent = Scope::new();
                 std::mem::swap(&mut self.scope, &mut parent);
-                if let Some(p) = parent.parent { self.scope = *p; }
+                if let Some(p) = parent.parent {
+                    self.scope = *p;
+                }
                 combined
             } else {
                 matches
             };
-            let body_block = self.context.append_basic_block(current_fn, &format!("chain_body{}", i));
+            let body_block = self
+                .context
+                .append_basic_block(current_fn, &format!("chain_body{}", i));
 
             if is_last {
                 let _ = self.builder.build_unconditional_branch(body_block);
             } else {
-                next_check = self.context.append_basic_block(current_fn, &format!("chain_check{}", i + 1));
-                let _ = self.builder.build_conditional_branch(matches, body_block, next_check);
+                next_check = self
+                    .context
+                    .append_basic_block(current_fn, &format!("chain_check{}", i + 1));
+                let _ = self
+                    .builder
+                    .build_conditional_branch(matches, body_block, next_check);
             }
 
             self.builder.position_at_end(body_block);
@@ -121,16 +144,25 @@ impl<'ctx> CodeGen<'ctx> {
             // Restore scope
             let mut parent = Scope::new();
             std::mem::swap(&mut self.scope, &mut parent);
-            if let Some(p) = parent.parent { self.scope = *p; }
+            if let Some(p) = parent.parent {
+                self.scope = *p;
+            }
             let _ = self.builder.build_unconditional_branch(merge_block);
         }
 
         self.builder.position_at_end(merge_block);
-        let loaded = self.builder.build_load(result_ty, result_alloca, "chain_ld").map_err(llvm_err)?;
+        let loaded = self
+            .builder
+            .build_load(result_ty, result_alloca, "chain_ld")
+            .map_err(llvm_err)?;
         self.bv_to_typed(loaded)
     }
 
-    pub(super) fn compile_value_match(&mut self, value: &Expr, arms: &[WhenArm]) -> Result<TypedValue<'ctx>, String> {
+    pub(super) fn compile_value_match(
+        &mut self,
+        value: &Expr,
+        arms: &[WhenArm],
+    ) -> Result<TypedValue<'ctx>, String> {
         if arms.is_empty() {
             return Ok(TypedValue::Unit);
         }
@@ -138,7 +170,9 @@ impl<'ctx> CodeGen<'ctx> {
         // Check exhaustiveness for enum matching
         self.registry.check_when_exhaustive(arms)?;
 
-        let current_fn = self.builder.get_insert_block()
+        let current_fn = self
+            .builder
+            .get_insert_block()
             .and_then(|b| b.get_parent())
             .ok_or("Cannot compile when outside function")?;
 
@@ -148,11 +182,12 @@ impl<'ctx> CodeGen<'ctx> {
         let matched_type = self.infer_expr_type(value);
 
         // Infer result type: prefer enum type if any arm returns one, otherwise use Int
-        let arm_types: Vec<Type> = arms.iter()
-            .map(|a| self.infer_expr_type(&a.body))
-            .collect();
-        let result_type = arm_types.iter()
-            .find(|t| matches!(t, Type::Named(n) if self.enum_types.contains_key(n) || n == "String"))
+        let arm_types: Vec<Type> = arms.iter().map(|a| self.infer_expr_type(&a.body)).collect();
+        let result_type = arm_types
+            .iter()
+            .find(
+                |t| matches!(t, Type::Named(n) if self.enum_types.contains_key(n) || n == "String"),
+            )
             .or_else(|| arm_types.first())
             .cloned()
             .unwrap_or_else(|| Type::Named("Int".into()));
@@ -162,14 +197,21 @@ impl<'ctx> CodeGen<'ctx> {
         let entry = current_fn.get_first_basic_block().unwrap();
         let saved_pos = self.builder.get_insert_block();
         match entry.get_first_instruction() {
-            Some(instr) => { let _ = self.builder.position_before(&instr); }
+            Some(instr) => {
+                let _ = self.builder.position_before(&instr);
+            }
             None => self.builder.position_at_end(entry),
         }
-        let result_alloca = self.builder.build_alloca(result_ty, "match_result").map_err(llvm_err)?;
+        let result_alloca = self
+            .builder
+            .build_alloca(result_ty, "match_result")
+            .map_err(llvm_err)?;
         // Zero-initialize to prevent garbage reads when an arm stores fewer bytes
         // than the full result type (e.g., storing i64 into {i64, ptr} for Option)
         let zero = result_ty.const_zero();
-        self.builder.build_store(result_alloca, zero).map_err(llvm_err)?;
+        self.builder
+            .build_store(result_alloca, zero)
+            .map_err(llvm_err)?;
         if let Some(block) = saved_pos {
             self.builder.position_at_end(block);
         }
@@ -190,21 +232,32 @@ impl<'ctx> CodeGen<'ctx> {
                 self.scope = Scope::with_parent(saved_scope);
                 self.bind_pattern_vars(&arm.pattern, Some(&matched_val), Some(&matched_type))?;
                 let guard_matches = self.compile_guard(&arm.guard)?;
-                let combined = self.builder.build_and(matches, guard_matches, "guard_and").map_err(llvm_err)?;
+                let combined = self
+                    .builder
+                    .build_and(matches, guard_matches, "guard_and")
+                    .map_err(llvm_err)?;
                 let mut parent = Scope::new();
                 std::mem::swap(&mut self.scope, &mut parent);
-                if let Some(p) = parent.parent { self.scope = *p; }
+                if let Some(p) = parent.parent {
+                    self.scope = *p;
+                }
                 combined
             } else {
                 matches
             };
-            let body_block = self.context.append_basic_block(current_fn, &format!("match_body{}", i));
+            let body_block = self
+                .context
+                .append_basic_block(current_fn, &format!("match_body{}", i));
 
             if is_last {
                 let _ = self.builder.build_unconditional_branch(body_block);
             } else {
-                next_check = self.context.append_basic_block(current_fn, &format!("match_check{}", i + 1));
-                let _ = self.builder.build_conditional_branch(matches, body_block, next_check);
+                next_check = self
+                    .context
+                    .append_basic_block(current_fn, &format!("match_check{}", i + 1));
+                let _ = self
+                    .builder
+                    .build_conditional_branch(matches, body_block, next_check);
             }
 
             self.builder.position_at_end(body_block);
@@ -228,19 +281,28 @@ impl<'ctx> CodeGen<'ctx> {
             self.store_value_to_alloca(&body_val, result_alloca)?;
             let mut parent = Scope::new();
             std::mem::swap(&mut self.scope, &mut parent);
-            if let Some(p) = parent.parent { self.scope = *p; }
+            if let Some(p) = parent.parent {
+                self.scope = *p;
+            }
             let _ = self.builder.build_unconditional_branch(merge_block);
         }
 
         self.builder.position_at_end(merge_block);
-        let loaded = self.builder.build_load(result_ty, result_alloca, "match_ld").map_err(llvm_err)?;
+        let loaded = self
+            .builder
+            .build_load(result_ty, result_alloca, "match_ld")
+            .map_err(llvm_err)?;
         self.bv_to_typed(loaded)
     }
 
     /// Compile a pattern as a boolean condition (for ConditionChain).
     /// For ConditionChain, patterns act as conditions: Literal/Ident/Variable are truthy,
     /// Wildcard is always true.
-    pub(super) fn compile_pattern_condition(&mut self, pattern: &Pattern, _matched_val: Option<&TypedValue<'ctx>>) -> Result<IntValue<'ctx>, String> {
+    pub(super) fn compile_pattern_condition(
+        &mut self,
+        pattern: &Pattern,
+        _matched_val: Option<&TypedValue<'ctx>>,
+    ) -> Result<IntValue<'ctx>, String> {
         let b1 = self.bool_ty();
         match pattern {
             Pattern::Wildcard => Ok(b1.const_int(1, false)),
@@ -289,7 +351,11 @@ impl<'ctx> CodeGen<'ctx> {
 
     /// Compile a pattern match against a value (for ValueMatch).
     /// Returns an i1: true if the pattern matches, false otherwise.
-    pub(super) fn compile_pattern_match(&mut self, pattern: &Pattern, val: &TypedValue<'ctx>) -> Result<IntValue<'ctx>, String> {
+    pub(super) fn compile_pattern_match(
+        &mut self,
+        pattern: &Pattern,
+        val: &TypedValue<'ctx>,
+    ) -> Result<IntValue<'ctx>, String> {
         let b1 = self.bool_ty();
         match pattern {
             Pattern::Wildcard => Ok(b1.const_int(1, false)),
@@ -298,7 +364,9 @@ impl<'ctx> CodeGen<'ctx> {
                     Literal::Int(n) => {
                         if let TypedValue::Int(iv) = val {
                             let const_val = self.i64_ty().const_int(*n as u64, true);
-                            Ok(self.builder.build_int_compare(IntPredicate::EQ, *iv, const_val, "match_int")
+                            Ok(self
+                                .builder
+                                .build_int_compare(IntPredicate::EQ, *iv, const_val, "match_int")
                                 .map_err(llvm_err)?)
                         } else {
                             Ok(b1.const_int(0, false))
@@ -307,7 +375,9 @@ impl<'ctx> CodeGen<'ctx> {
                     Literal::Bool(b) => {
                         if let TypedValue::Bool(bv) = val {
                             let const_val = b1.const_int(if *b { 1 } else { 0 }, false);
-                            Ok(self.builder.build_int_compare(IntPredicate::EQ, *bv, const_val, "match_bool")
+                            Ok(self
+                                .builder
+                                .build_int_compare(IntPredicate::EQ, *bv, const_val, "match_bool")
                                 .map_err(llvm_err)?)
                         } else {
                             Ok(b1.const_int(0, false))
@@ -327,10 +397,17 @@ impl<'ctx> CodeGen<'ctx> {
                             let pat_data = global.as_pointer_value();
                             let undef = self.string_type.get_undef();
                             let pat_len = self.i64_ty().const_int(str_bytes.len() as u64, false);
-                            let s1 = self.builder.build_insert_value(undef, pat_len, 0, "pat_len").map_err(llvm_err)?;
-                            let pat_str_agg = self.builder.build_insert_value(s1, pat_data, 1, "pat_str").map_err(llvm_err)?;
+                            let s1 = self
+                                .builder
+                                .build_insert_value(undef, pat_len, 0, "pat_len")
+                                .map_err(llvm_err)?;
+                            let pat_str_agg = self
+                                .builder
+                                .build_insert_value(s1, pat_data, 1, "pat_str")
+                                .map_err(llvm_err)?;
                             let pat_str = pat_str_agg.into_struct_value();
-                            let cc = self.call_rt("atomic_string_eq", &[str_val.into(), pat_str.into()])?;
+                            let cc = self
+                                .call_rt("atomic_string_eq", &[str_val.into(), pat_str.into()])?;
                             let eq_result = cc.try_as_basic_value().unwrap_basic().into_int_value();
                             Ok(eq_result)
                         } else {
@@ -340,7 +417,9 @@ impl<'ctx> CodeGen<'ctx> {
                     Literal::Char(c) => {
                         if let TypedValue::Int(iv) = val {
                             let const_val = self.i64_ty().const_int(*c as u64, false);
-                            Ok(self.builder.build_int_compare(IntPredicate::EQ, *iv, const_val, "match_char")
+                            Ok(self
+                                .builder
+                                .build_int_compare(IntPredicate::EQ, *iv, const_val, "match_char")
                                 .map_err(llvm_err)?)
                         } else {
                             Ok(b1.const_int(0, false))
@@ -349,20 +428,35 @@ impl<'ctx> CodeGen<'ctx> {
                     Literal::Float(f) => {
                         if let TypedValue::Float(fv) = val {
                             let const_val = self.f64_ty().const_float(*f);
-                            Ok(self.builder.build_float_compare(FloatPredicate::OEQ, *fv, const_val, "match_float")
+                            Ok(self
+                                .builder
+                                .build_float_compare(
+                                    FloatPredicate::OEQ,
+                                    *fv,
+                                    const_val,
+                                    "match_float",
+                                )
                                 .map_err(llvm_err)?)
                         } else if let TypedValue::Int(iv) = val {
-                            let fv = self.builder.build_signed_int_to_float(*iv, self.f64_ty(), "int2float").map_err(llvm_err)?;
+                            let fv = self
+                                .builder
+                                .build_signed_int_to_float(*iv, self.f64_ty(), "int2float")
+                                .map_err(llvm_err)?;
                             let const_val = self.f64_ty().const_float(*f);
-                            Ok(self.builder.build_float_compare(FloatPredicate::OEQ, fv, const_val, "match_float_from_int")
+                            Ok(self
+                                .builder
+                                .build_float_compare(
+                                    FloatPredicate::OEQ,
+                                    fv,
+                                    const_val,
+                                    "match_float_from_int",
+                                )
                                 .map_err(llvm_err)?)
                         } else {
                             Ok(b1.const_int(0, false))
                         }
                     }
-                    Literal::Unit => {
-                        Ok(b1.const_int(0, false))
-                    }
+                    Literal::Unit => Ok(b1.const_int(0, false)),
                 }
             }
             Pattern::Variable(_) => Ok(b1.const_int(1, false)),
@@ -370,14 +464,22 @@ impl<'ctx> CodeGen<'ctx> {
                 // Check if val is an enum with matching variant tag
                 if let TypedValue::Enum(ptr, enum_st, ..) = val {
                     let bt: BasicTypeEnum = (*enum_st).into();
-                    let loaded = self.builder.build_load(bt, *ptr, "enum_ld").map_err(llvm_err)?;
+                    let loaded = self
+                        .builder
+                        .build_load(bt, *ptr, "enum_ld")
+                        .map_err(llvm_err)?;
                     let enum_struct = loaded.into_struct_value();
-                    let tag = self.builder.build_extract_value(enum_struct, 0, "tag")
-                        .map_err(llvm_err)?.into_int_value();
+                    let tag = self
+                        .builder
+                        .build_extract_value(enum_struct, 0, "tag")
+                        .map_err(llvm_err)?
+                        .into_int_value();
 
                     if let Some((_, variant)) = self.registry.lookup_variant(name) {
                         let expected_tag = self.i64_ty().const_int(variant.tag as u64, false);
-                        Ok(self.builder.build_int_compare(IntPredicate::EQ, tag, expected_tag, "tag_match")
+                        Ok(self
+                            .builder
+                            .build_int_compare(IntPredicate::EQ, tag, expected_tag, "tag_match")
                             .map_err(llvm_err)?)
                     } else {
                         Ok(b1.const_int(0, false))
@@ -394,11 +496,18 @@ impl<'ctx> CodeGen<'ctx> {
                         (TypedValue::Int(a), TypedValue::Int(b)) => (*a, *b),
                         _ => return Err("Range bounds must be integers".to_string()),
                     };
-                    let ge = self.builder.build_int_compare(IntPredicate::SGE, *iv, sv, "range_lo")
+                    let ge = self
+                        .builder
+                        .build_int_compare(IntPredicate::SGE, *iv, sv, "range_lo")
                         .map_err(llvm_err)?;
-                    let lt = self.builder.build_int_compare(IntPredicate::SLT, *iv, ev, "range_hi")
+                    let lt = self
+                        .builder
+                        .build_int_compare(IntPredicate::SLT, *iv, ev, "range_hi")
                         .map_err(llvm_err)?;
-                    Ok(self.builder.build_and(ge, lt, "range_match").map_err(llvm_err)?)
+                    Ok(self
+                        .builder
+                        .build_and(ge, lt, "range_match")
+                        .map_err(llvm_err)?)
                 } else {
                     Ok(b1.const_int(0, false))
                 }
@@ -408,12 +517,20 @@ impl<'ctx> CodeGen<'ctx> {
                 if let Some((_, variant)) = self.registry.lookup_variant(type_name) {
                     if let TypedValue::Enum(ptr, enum_st, ..) = val {
                         let bt: BasicTypeEnum = (*enum_st).into();
-                        let loaded = self.builder.build_load(bt, *ptr, "is_enum_ld").map_err(llvm_err)?;
+                        let loaded = self
+                            .builder
+                            .build_load(bt, *ptr, "is_enum_ld")
+                            .map_err(llvm_err)?;
                         let enum_struct = loaded.into_struct_value();
-                        let tag = self.builder.build_extract_value(enum_struct, 0, "is_tag")
-                            .map_err(llvm_err)?.into_int_value();
+                        let tag = self
+                            .builder
+                            .build_extract_value(enum_struct, 0, "is_tag")
+                            .map_err(llvm_err)?
+                            .into_int_value();
                         let expected_tag = self.i64_ty().const_int(variant.tag as u64, false);
-                        return Ok(self.builder.build_int_compare(IntPredicate::EQ, tag, expected_tag, "is_variant")
+                        return Ok(self
+                            .builder
+                            .build_int_compare(IntPredicate::EQ, tag, expected_tag, "is_variant")
                             .map_err(llvm_err)?);
                     }
                     return Ok(b1.const_int(0, false));
@@ -433,7 +550,10 @@ impl<'ctx> CodeGen<'ctx> {
                 let mut result = b1.const_int(0, false);
                 for p in patterns {
                     let m = self.compile_pattern_match(p, val)?;
-                    result = self.builder.build_or(result, m, "or_match").map_err(llvm_err)?;
+                    result = self
+                        .builder
+                        .build_or(result, m, "or_match")
+                        .map_err(llvm_err)?;
                 }
                 Ok(result)
             }
@@ -445,7 +565,9 @@ impl<'ctx> CodeGen<'ctx> {
                     TypedValue::Bool(b) => Ok(b),
                     TypedValue::Int(i) => {
                         let zero = self.i64_ty().const_int(0, false);
-                        Ok(self.builder.build_int_compare(IntPredicate::NE, i, zero, "expr_match")
+                        Ok(self
+                            .builder
+                            .build_int_compare(IntPredicate::NE, i, zero, "expr_match")
                             .map_err(llvm_err)?)
                     }
                     _ => Ok(b1.const_int(1, false)),
@@ -457,7 +579,12 @@ impl<'ctx> CodeGen<'ctx> {
     /// Bind pattern variables into the current scope.
     /// For ValueMatch: bind the matched value to the variable name.
     /// For ConditionChain: the variable binding is just the condition value itself.
-    pub(super) fn bind_pattern_vars(&mut self, pattern: &Pattern, matched_val: Option<&TypedValue<'ctx>>, matched_type: Option<&Type>) -> Result<(), String> {
+    pub(super) fn bind_pattern_vars(
+        &mut self,
+        pattern: &Pattern,
+        matched_val: Option<&TypedValue<'ctx>>,
+        matched_type: Option<&Type>,
+    ) -> Result<(), String> {
         match pattern {
             Pattern::Variable(name) => {
                 if let Some(val) = matched_val {
@@ -467,28 +594,49 @@ impl<'ctx> CodeGen<'ctx> {
                     self.scope.set(name.clone(), alloca, ty, val.val_kind());
                 }
             }
-            Pattern::Constructor { name: variant_name, args, named_fields } => {
+            Pattern::Constructor {
+                name: variant_name,
+                args,
+                named_fields,
+            } => {
                 if let Some(TypedValue::Enum(ptr, enum_st, ..)) = matched_val {
                     let bt: BasicTypeEnum = (*enum_st).into();
-                    let loaded = self.builder.build_load(bt, *ptr, "enum_ld").map_err(llvm_err)?;
+                    let loaded = self
+                        .builder
+                        .build_load(bt, *ptr, "enum_ld")
+                        .map_err(llvm_err)?;
                     let enum_struct = loaded.into_struct_value();
-                    let data_ptr = self.builder.build_extract_value(enum_struct, 1, "data")
-                        .map_err(llvm_err)?.into_pointer_value();
+                    let data_ptr = self
+                        .builder
+                        .build_extract_value(enum_struct, 1, "data")
+                        .map_err(llvm_err)?
+                        .into_pointer_value();
 
                     // Try to resolve variant params if we have the matched type
-                    let resolved_params = self.resolve_variant_params(variant_name, matched_type, args.len() + named_fields.len());
+                    let resolved_params = self.resolve_variant_params(
+                        variant_name,
+                        matched_type,
+                        args.len() + named_fields.len(),
+                    );
 
                     if args.len() == 1 && named_fields.is_empty() && resolved_params.is_some() {
                         // Single positional param: use type info to create proper TypedValue
                         let param_types = resolved_params.as_ref().unwrap();
                         if let Some(param_ty) = param_types.first() {
                             if let Type::Named(name) = param_ty {
-                                if self.named_structs.contains_key(name.as_str()) && args.len() == 1 {
+                                if self.named_structs.contains_key(name.as_str()) && args.len() == 1
+                                {
                                     let st = self.named_structs[name.as_str()];
                                     let bt: BasicTypeEnum = st.into();
-                                    let alloca = self.builder.build_alloca(bt, "pat_struct").map_err(llvm_err)?;
+                                    let alloca = self
+                                        .builder
+                                        .build_alloca(bt, "pat_struct")
+                                        .map_err(llvm_err)?;
                                     // Load struct from heap (data_ptr points to the struct data)
-                                    let loaded = self.builder.build_load(bt, data_ptr, "ps_ld").map_err(llvm_err)?;
+                                    let loaded = self
+                                        .builder
+                                        .build_load(bt, data_ptr, "ps_ld")
+                                        .map_err(llvm_err)?;
                                     self.builder.build_store(alloca, loaded).map_err(llvm_err)?;
                                     let tv = TypedValue::Struct(alloca, st);
                                     self.bind_pattern_vars(&args[0], Some(&tv), Some(param_ty))?;
@@ -503,12 +651,19 @@ impl<'ctx> CodeGen<'ctx> {
                     if total_params > 0 {
                         // Bind positional sub-patterns
                         for (i, sub) in args.iter().enumerate() {
-                            let data_i64 = self.builder.build_pointer_cast(data_ptr, self.ptr_ty(), "data_i64")
+                            let data_i64 = self
+                                .builder
+                                .build_pointer_cast(data_ptr, self.ptr_ty(), "data_i64")
                                 .map_err(llvm_err)?;
                             let idx = self.i64_ty().const_int(i as u64, false);
-                            let field_ptr = unsafe { self.builder.build_gep(self.i64_ty(), data_i64, &[idx], "fld") }
-                                .map_err(llvm_err)?;
-                            let field_val = self.builder.build_load(self.i64_ty(), field_ptr, "fld_ld")
+                            let field_ptr = unsafe {
+                                self.builder
+                                    .build_gep(self.i64_ty(), data_i64, &[idx], "fld")
+                            }
+                            .map_err(llvm_err)?;
+                            let field_val = self
+                                .builder
+                                .build_load(self.i64_ty(), field_ptr, "fld_ld")
                                 .map_err(llvm_err)?;
                             let tv = self.bv_to_typed(field_val);
                             if let Ok(tv) = tv {
@@ -518,16 +673,25 @@ impl<'ctx> CodeGen<'ctx> {
                         }
                         // Bind named fields similarly
                         for (ni, (_, sub)) in named_fields.iter().enumerate() {
-                            let data_i64 = self.builder.build_pointer_cast(data_ptr, self.ptr_ty(), "data_i64")
+                            let data_i64 = self
+                                .builder
+                                .build_pointer_cast(data_ptr, self.ptr_ty(), "data_i64")
                                 .map_err(llvm_err)?;
                             let idx = self.i64_ty().const_int((args.len() + ni) as u64, false);
-                            let field_ptr = unsafe { self.builder.build_gep(self.i64_ty(), data_i64, &[idx], "nfld") }
-                                .map_err(llvm_err)?;
-                            let field_val = self.builder.build_load(self.i64_ty(), field_ptr, "nfld_ld")
+                            let field_ptr = unsafe {
+                                self.builder
+                                    .build_gep(self.i64_ty(), data_i64, &[idx], "nfld")
+                            }
+                            .map_err(llvm_err)?;
+                            let field_val = self
+                                .builder
+                                .build_load(self.i64_ty(), field_ptr, "nfld_ld")
                                 .map_err(llvm_err)?;
                             let tv = self.bv_to_typed(field_val);
                             if let Ok(tv) = tv {
-                                let sub_ty = resolved_params.as_ref().and_then(|p| p.get(args.len() + ni));
+                                let sub_ty = resolved_params
+                                    .as_ref()
+                                    .and_then(|p| p.get(args.len() + ni));
                                 self.bind_pattern_vars(sub, Some(&tv), sub_ty)?;
                             }
                         }
@@ -550,7 +714,12 @@ impl<'ctx> CodeGen<'ctx> {
     /// Resolve variant parameter types using the matched expression's AST type.
     /// For example, if matched_type is Option<Date> and variant is Some(T),
     /// resolve T = Date and return [Date].
-    pub(super) fn resolve_variant_params(&self, variant_name: &str, matched_type: Option<&Type>, expected_count: usize) -> Option<Vec<Type>> {
+    pub(super) fn resolve_variant_params(
+        &self,
+        variant_name: &str,
+        matched_type: Option<&Type>,
+        expected_count: usize,
+    ) -> Option<Vec<Type>> {
         let mt = matched_type?;
         // Get the enum info for this variant
         let (enum_info, variant_info) = self.registry.lookup_variant(variant_name)?;
@@ -561,8 +730,14 @@ impl<'ctx> CodeGen<'ctx> {
             Type::Named(n) if n == enum_name => Some(&vec![]), // for non-generic enums or enum with no params
             Type::Generic(base, params) => {
                 if let Type::Named(n) = base.as_ref() {
-                    if n == enum_name { Some(params) } else { None }
-                } else { None }
+                    if n == enum_name {
+                        Some(params)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
             }
             _ => None,
         };
@@ -598,12 +773,11 @@ impl<'ctx> CodeGen<'ctx> {
     /// Resolve a type by substituting type variables with concrete types
     pub(super) fn resolve_type(&self, ty: &Type, type_map: &HashMap<String, Type>) -> Type {
         match ty {
-            Type::Named(name) => {
-                type_map.get(name).cloned().unwrap_or_else(|| ty.clone())
-            }
+            Type::Named(name) => type_map.get(name).cloned().unwrap_or_else(|| ty.clone()),
             Type::Generic(base, params) => {
                 let new_base = self.resolve_type(base, type_map);
-                let new_params: Vec<Type> = params.iter()
+                let new_params: Vec<Type> = params
+                    .iter()
                     .map(|p| self.resolve_type(p, type_map))
                     .collect();
                 Type::Generic(Box::new(new_base), new_params)
@@ -612,8 +786,15 @@ impl<'ctx> CodeGen<'ctx> {
         }
     }
 
-    pub(super) fn compile_when_branch_lazy(&mut self, c: IntValue<'ctx>, then_expr: &Expr, else_expr: &Expr) -> Result<TypedValue<'ctx>, String> {
-        let current_fn = self.builder.get_insert_block()
+    pub(super) fn compile_when_branch_lazy(
+        &mut self,
+        c: IntValue<'ctx>,
+        then_expr: &Expr,
+        else_expr: &Expr,
+    ) -> Result<TypedValue<'ctx>, String> {
+        let current_fn = self
+            .builder
+            .get_insert_block()
             .and_then(|b| b.get_parent())
             .ok_or("Cannot compile when outside function".to_string())?;
 
@@ -621,26 +802,37 @@ impl<'ctx> CodeGen<'ctx> {
         let else_diverges = matches!(else_expr, Expr::Continue | Expr::Break);
 
         // Infer result type from the non-divergent branch
-        let result_type = if !then_diverges { self.infer_expr_type(then_expr) }
-                          else if !else_diverges { self.infer_expr_type(else_expr) }
-                          else { Type::Named("Int".into()) };
+        let result_type = if !then_diverges {
+            self.infer_expr_type(then_expr)
+        } else if !else_diverges {
+            self.infer_expr_type(else_expr)
+        } else {
+            Type::Named("Int".into())
+        };
         let result_ty: BasicTypeEnum = self.ast_type_to_basic_type(&result_type);
 
         let then_block = self.context.append_basic_block(current_fn, "when_then");
         let else_block = self.context.append_basic_block(current_fn, "when_else");
         let merge_block = self.context.append_basic_block(current_fn, "when_merge");
 
-        let _ = self.builder.build_conditional_branch(c, then_block, else_block);
+        let _ = self
+            .builder
+            .build_conditional_branch(c, then_block, else_block);
 
         // Alloca at entry for the non-divergent branch(es) to store into
         let result_alloca = if !then_diverges || !else_diverges {
             let entry = current_fn.get_first_basic_block().unwrap();
             let saved_pos = self.builder.get_insert_block();
             match entry.get_first_instruction() {
-                Some(instr) => { let _ = self.builder.position_before(&instr); }
+                Some(instr) => {
+                    let _ = self.builder.position_before(&instr);
+                }
                 None => self.builder.position_at_end(entry),
             }
-            let alloca = self.builder.build_alloca(result_ty, "when_result").map_err(llvm_err)?;
+            let alloca = self
+                .builder
+                .build_alloca(result_ty, "when_result")
+                .map_err(llvm_err)?;
             if let Some(block) = saved_pos {
                 self.builder.position_at_end(block);
             }
@@ -674,12 +866,14 @@ impl<'ctx> CodeGen<'ctx> {
         // Merge: load result if at least one branch reaches here
         self.builder.position_at_end(merge_block);
         if let Some(alloca) = result_alloca {
-            let loaded = self.builder.build_load(result_ty, alloca, "when_ld").map_err(llvm_err)?;
+            let loaded = self
+                .builder
+                .build_load(result_ty, alloca, "when_ld")
+                .map_err(llvm_err)?;
             self.bv_to_typed(loaded)
         } else {
             // Both branches diverged — this merge block is unreachable
             Ok(TypedValue::Unit)
         }
     }
-
 }

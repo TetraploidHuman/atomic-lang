@@ -1,5 +1,5 @@
-use std::fmt;
 use crate::lexer::Span;
+use std::fmt;
 
 // ---- Types as written in source code ----
 
@@ -114,13 +114,28 @@ impl fmt::Display for Literal {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BinaryOp {
     // Arithmetic
-    Add, Sub, Mul, Div, Mod, Pow,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+    Pow,
     // Comparison
-    Eq, Neq, Lt, Gt, Lte, Gte,
+    Eq,
+    Neq,
+    Lt,
+    Gt,
+    Lte,
+    Gte,
     // Logical
-    And, Or,
+    And,
+    Or,
     // Bitwise
-    BitAnd, BitOr, BitXor, Shl, Shr,
+    BitAnd,
+    BitOr,
+    BitXor,
+    Shl,
+    Shr,
     // Range
     Range,
     RangeExclusive,
@@ -213,7 +228,11 @@ impl fmt::Display for Pattern {
             Pattern::Wildcard => write!(f, "_"),
             Pattern::Literal(lit) => write!(f, "{}", lit),
             Pattern::Variable(name) => write!(f, "{}", name),
-            Pattern::Constructor { name, args, named_fields } => {
+            Pattern::Constructor {
+                name,
+                args,
+                named_fields,
+            } => {
                 write!(f, "{}", name)?;
                 if !args.is_empty() || !named_fields.is_empty() {
                     write!(f, "(")?;
@@ -353,9 +372,7 @@ pub enum WhenKind {
         arms: Vec<WhenArm>,
     },
     /// when { conditions -> expressions }
-    ConditionChain {
-        arms: Vec<WhenArm>,
-    },
+    ConditionChain { arms: Vec<WhenArm> },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -392,9 +409,7 @@ pub enum ForKind {
         body: Box<Expr>,
     },
     /// for { body } (infinite loop)
-    Infinite {
-        body: Box<Expr>,
-    },
+    Infinite { body: Box<Expr> },
     /// Nested iterate: for x in xs, y in ys { body } (cartesian product)
     NestedIterate {
         bindings: Vec<(String, Expr)>,
@@ -410,7 +425,11 @@ impl fmt::Display for Expr {
             Expr::Ident(name) => write!(f, "{}", name),
             Expr::Binary(lhs, op, rhs) => write!(f, "({} {} {})", lhs, op, rhs),
             Expr::Unary(op, expr) => write!(f, "{}{}", op, expr),
-            Expr::Call { func, args, trailing_lambda } => {
+            Expr::Call {
+                func,
+                args,
+                trailing_lambda,
+            } => {
                 write!(f, "{}(", func)?;
                 for (i, a) in args.iter().enumerate() {
                     if i > 0 {
@@ -424,7 +443,11 @@ impl fmt::Display for Expr {
                 }
                 Ok(())
             }
-            Expr::Lambda { params, body, implicit_it } => {
+            Expr::Lambda {
+                params,
+                body,
+                implicit_it,
+            } => {
                 write!(f, "{{")?;
                 if *implicit_it {
                     write!(f, " it -> {}", body)?;
@@ -513,7 +536,11 @@ impl fmt::Display for Expr {
                 write!(f, ")")
             }
             Expr::Try(inner) => write!(f, "{}?", inner),
-            Expr::Assign { target, value, propagate: _ } => write!(f, "{} = {}", target, value),
+            Expr::Assign {
+                target,
+                value,
+                propagate: _,
+            } => write!(f, "{} = {}", target, value),
             Expr::StringInterpolate(parts) => {
                 write!(f, "\"")?;
                 for p in parts {
@@ -536,8 +563,16 @@ impl fmt::Display for Expr {
 impl fmt::Display for When {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.kind {
-            WhenKind::OneLine { condition, then_expr, else_expr } => {
-                write!(f, "when {} {{ {} else {} }}", condition, then_expr, else_expr)
+            WhenKind::OneLine {
+                condition,
+                then_expr,
+                else_expr,
+            } => {
+                write!(
+                    f,
+                    "when {} {{ {} else {} }}",
+                    condition, then_expr, else_expr
+                )
             }
             WhenKind::ValueMatch { value, arms } => {
                 write!(f, "when {} {{\n", value)?;
@@ -560,10 +595,19 @@ impl fmt::Display for When {
 impl fmt::Display for For {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.kind {
-            ForKind::Iterate { var, iterable, body, .. } => {
+            ForKind::Iterate {
+                var,
+                iterable,
+                body,
+                ..
+            } => {
                 write!(f, "for {} in {} {{ {} }}", var, iterable, body)
             }
-            ForKind::IterateWithIndex { vars, iterable, body } => {
+            ForKind::IterateWithIndex {
+                vars,
+                iterable,
+                body,
+            } => {
                 let vs = vars.join(", ");
                 write!(f, "for ({}) in {} {{ {} }}", vs, iterable, body)
             }
@@ -615,8 +659,8 @@ pub enum Stmt {
         /// Renames for struct destructuring: val {x as px, y as py} = point
         renames: Vec<(String, String)>, // (field_name, local_name)
         rest: Option<String>, // for list rest pattern: val [head, ...tail] = list
-        is_list: bool, // true for list destructuring [a, b], false for tuple (x, y)
-        is_struct: bool, // true for struct destructuring {x, y}
+        is_list: bool,        // true for list destructuring [a, b], false for tuple (x, y)
+        is_struct: bool,      // true for struct destructuring {x, y}
         value: Expr,
         span: Span,
     },
@@ -691,10 +735,7 @@ pub enum Stmt {
         span: Span,
     },
     /// External type declaration: external type Name
-    ExternalType {
-        name: String,
-        span: Span,
-    },
+    ExternalType { name: String, span: Span },
 }
 
 impl Stmt {
@@ -754,7 +795,15 @@ impl fmt::Display for Param {
 impl fmt::Display for Stmt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Stmt::Let { mutable, propagate, lazy_init, name, type_ann, value, .. } => {
+            Stmt::Let {
+                mutable,
+                propagate,
+                lazy_init,
+                name,
+                type_ann,
+                value,
+                ..
+            } => {
                 let lazy_kw = if *lazy_init { "lazy " } else { "" };
                 let kw = if *mutable { "var" } else { "val" };
                 let propagation = if *propagate { "?" } else { "" };
@@ -764,7 +813,17 @@ impl fmt::Display for Stmt {
                 }
                 write!(f, " = {}", value)
             }
-            Stmt::Destructure { mutable, propagate, names, renames, rest, is_list, is_struct, value, .. } => {
+            Stmt::Destructure {
+                mutable,
+                propagate,
+                names,
+                renames,
+                rest,
+                is_list,
+                is_struct,
+                value,
+                ..
+            } => {
                 let kw = if *mutable { "var" } else { "val" };
                 let propagation = if *propagate { "?" } else { "" };
                 if *is_struct {
@@ -775,27 +834,48 @@ impl fmt::Display for Stmt {
                     write!(f, "{}{} (", kw, propagation)?;
                 }
                 for (i, n) in names.iter().enumerate() {
-                    if i > 0 { write!(f, ", ")?; }
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
                     // Check for rename
                     if let Some((_, local)) = renames.iter().find(|(fld, _)| fld == n) {
                         write!(f, "{}", n)?;
-                        if n != local { write!(f, " as {}", local)?; }
+                        if n != local {
+                            write!(f, " as {}", local)?;
+                        }
                     } else {
                         write!(f, "{}", n)?;
                     }
                 }
                 if let Some(r) = rest {
-                    if !names.is_empty() { write!(f, ", ")?; }
+                    if !names.is_empty() {
+                        write!(f, ", ")?;
+                    }
                     write!(f, "...{}", r)?;
                 }
-                let close = if *is_struct { "}" } else if *is_list { "]" } else { ")" };
+                let close = if *is_struct {
+                    "}"
+                } else if *is_list {
+                    "]"
+                } else {
+                    ")"
+                };
                 write!(f, "{} = {}", close, value)
             }
-            Stmt::Fun { name, params, return_type, body, type_params, .. } => {
+            Stmt::Fun {
+                name,
+                params,
+                return_type,
+                body,
+                type_params,
+                ..
+            } => {
                 if !type_params.is_empty() {
                     write!(f, "fun <")?;
                     for (i, tp) in type_params.iter().enumerate() {
-                        if i > 0 { write!(f, ", ")?; }
+                        if i > 0 {
+                            write!(f, ", ")?;
+                        }
                         write!(f, "{}", tp)?;
                     }
                     write!(f, "> ")?;
@@ -816,18 +896,36 @@ impl fmt::Display for Stmt {
                 write!(f, " = {}", body)
             }
             Stmt::Expr { expr, .. } => write!(f, "{}", expr),
-            Stmt::Return { value: Some(expr), .. } => write!(f, "return {}", expr),
+            Stmt::Return {
+                value: Some(expr), ..
+            } => write!(f, "return {}", expr),
             Stmt::Return { value: None, .. } => write!(f, "return"),
             Stmt::Break { .. } => write!(f, "break"),
             Stmt::Continue { .. } => write!(f, "continue"),
-            Stmt::TypeAlias { name, type_params, definition, .. } => {
+            Stmt::TypeAlias {
+                name,
+                type_params,
+                definition,
+                ..
+            } => {
                 if type_params.is_empty() {
                     write!(f, "type {} = {}", name, definition)
                 } else {
-                    write!(f, "type {}[{}] = {}", name, type_params.join(", "), definition)
+                    write!(
+                        f,
+                        "type {}[{}] = {}",
+                        name,
+                        type_params.join(", "),
+                        definition
+                    )
                 }
             }
-            Stmt::Enum { name, type_params, variants, .. } => {
+            Stmt::Enum {
+                name,
+                type_params,
+                variants,
+                ..
+            } => {
                 if type_params.is_empty() {
                     write!(f, "enum {} {{\n", name)?;
                 } else {
@@ -844,7 +942,9 @@ impl fmt::Display for Stmt {
                             }
                             match p {
                                 EnumVariantParam::Positional(ty) => write!(f, "{}", ty)?,
-                                EnumVariantParam::Named { name, ty } => write!(f, "{}: {}", name, ty)?,
+                                EnumVariantParam::Named { name, ty } => {
+                                    write!(f, "{}: {}", name, ty)?
+                                }
                             }
                         }
                         write!(f, ")\n")?;
@@ -852,7 +952,12 @@ impl fmt::Display for Stmt {
                 }
                 write!(f, "}}")
             }
-            Stmt::Module { name, exports, body, .. } => {
+            Stmt::Module {
+                name,
+                exports,
+                body,
+                ..
+            } => {
                 write!(f, "module {} {{\n", name)?;
                 for e in exports {
                     match e {
@@ -867,7 +972,12 @@ impl fmt::Display for Stmt {
                 write!(f, "}}")
             }
             Stmt::Export { stmt, .. } => write!(f, "export {}", stmt),
-            Stmt::Import { module, items, alias, .. } => {
+            Stmt::Import {
+                module,
+                items,
+                alias,
+                ..
+            } => {
                 write!(f, "import {}", module)?;
                 if let Some(its) = items {
                     write!(f, ".{{{}}}", its.join(", "))?;
@@ -877,24 +987,38 @@ impl fmt::Display for Stmt {
                 }
                 Ok(())
             }
-            Stmt::Const { name, type_ann, value, .. } => {
+            Stmt::Const {
+                name,
+                type_ann,
+                value,
+                ..
+            } => {
                 write!(f, "const {}", name)?;
                 if let Some(ty) = type_ann {
                     write!(f, ": {}", ty)?;
                 }
                 write!(f, " = {}", value)
             }
-            Stmt::Extension { type_name, methods, .. } => {
+            Stmt::Extension {
+                type_name, methods, ..
+            } => {
                 write!(f, "extension {} {{\n", type_name)?;
                 for m in methods {
                     write!(f, "    {}\n", m)?;
                 }
                 write!(f, "}}")
             }
-            Stmt::External { name, params, return_type, .. } => {
+            Stmt::External {
+                name,
+                params,
+                return_type,
+                ..
+            } => {
                 write!(f, "external fun {}(", name)?;
                 for (i, p) in params.iter().enumerate() {
-                    if i > 0 { write!(f, ", ")?; }
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
                     write!(f, "{}", p.name)?;
                     if let Some(ref ty) = p.ty {
                         write!(f, ": {}", ty)?;
@@ -954,11 +1078,19 @@ impl Expr {
     }
 
     pub fn call(func: Expr, args: Vec<Expr>) -> Self {
-        Expr::Call { func: Box::new(func), args, trailing_lambda: None }
+        Expr::Call {
+            func: Box::new(func),
+            args,
+            trailing_lambda: None,
+        }
     }
 
     pub fn call_with_lambda(func: Expr, args: Vec<Expr>, lambda: Expr) -> Self {
-        Expr::Call { func: Box::new(func), args, trailing_lambda: Some(Box::new(lambda)) }
+        Expr::Call {
+            func: Box::new(func),
+            args,
+            trailing_lambda: Some(Box::new(lambda)),
+        }
     }
 
     pub fn lambda(params: Vec<&str>, body: Expr) -> Self {
@@ -970,7 +1102,11 @@ impl Expr {
     }
 
     pub fn it_lambda(body: Expr) -> Self {
-        Expr::Lambda { params: vec!["it".to_string()], body: Box::new(body), implicit_it: true }
+        Expr::Lambda {
+            params: vec!["it".to_string()],
+            body: Box::new(body),
+            implicit_it: true,
+        }
     }
 
     pub fn binary(lhs: Expr, op: BinaryOp, rhs: Expr) -> Self {
@@ -985,18 +1121,47 @@ impl Expr {
 #[allow(dead_code)]
 impl Stmt {
     pub fn val(name: &str, value: Expr) -> Self {
-        Stmt::Let { mutable: false, propagate: false, lazy_init: false, name: name.to_string(), type_ann: None, value, span: Span::default() }
+        Stmt::Let {
+            mutable: false,
+            propagate: false,
+            lazy_init: false,
+            name: name.to_string(),
+            type_ann: None,
+            value,
+            span: Span::default(),
+        }
     }
 
     pub fn var(name: &str, value: Expr) -> Self {
-        Stmt::Let { mutable: true, propagate: false, lazy_init: false, name: name.to_string(), type_ann: None, value, span: Span::default() }
+        Stmt::Let {
+            mutable: true,
+            propagate: false,
+            lazy_init: false,
+            name: name.to_string(),
+            type_ann: None,
+            value,
+            span: Span::default(),
+        }
     }
 
     pub fn fun(name: &str, params: Vec<Param>, return_type: Option<Type>, body: Expr) -> Self {
-        Stmt::Fun { name: name.to_string(), params, return_type, body, type_params: vec![], is_single_expr: false, span: Span::default() }
+        Stmt::Fun {
+            name: name.to_string(),
+            params,
+            return_type,
+            body,
+            type_params: vec![],
+            is_single_expr: false,
+            span: Span::default(),
+        }
     }
 
     pub fn const_(name: &str, type_ann: Option<Type>, value: Expr) -> Self {
-        Stmt::Const { name: name.to_string(), type_ann, value, span: Span::default() }
+        Stmt::Const {
+            name: name.to_string(),
+            type_ann,
+            value,
+            span: Span::default(),
+        }
     }
 }

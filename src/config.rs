@@ -72,29 +72,38 @@ impl ProjectConfig {
 
     /// Parse atom.toml content.
     fn parse(content: &str, _path: &Path) -> Result<Self, String> {
-        let root: toml::Table = toml::from_str(content)
-            .map_err(|e| format!("TOML parse error: {}", e))?;
+        let root: toml::Table =
+            toml::from_str(content).map_err(|e| format!("TOML parse error: {}", e))?;
 
         let mut config = Self::default();
 
         // [project]
         if let Some(project) = root.get("project").and_then(|v| v.as_table()) {
-            config.name = project.get("name")
+            config.name = project
+                .get("name")
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string();
-            config.version = project.get("version")
+            config.version = project
+                .get("version")
                 .and_then(|v| v.as_str())
                 .unwrap_or("0.1.0")
                 .to_string();
-            config.description = project.get("description")
+            config.description = project
+                .get("description")
                 .and_then(|v| v.as_str())
                 .map(|s| s.to_string());
-            config.authors = project.get("authors")
+            config.authors = project
+                .get("authors")
                 .and_then(|v| v.as_array())
-                .map(|arr| arr.iter().filter_map(|a| a.as_str().map(|s| s.to_string())).collect())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|a| a.as_str().map(|s| s.to_string()))
+                        .collect()
+                })
                 .unwrap_or_default();
-            config.main = project.get("main")
+            config.main = project
+                .get("main")
                 .and_then(|v| v.as_str())
                 .map(|s| PathBuf::from(s));
         }
@@ -119,10 +128,12 @@ impl ProjectConfig {
 
         // [build]
         if let Some(build) = root.get("build").and_then(|v| v.as_table()) {
-            config.optimize = build.get("optimize")
+            config.optimize = build
+                .get("optimize")
                 .and_then(|v| v.as_bool())
                 .unwrap_or(false);
-            config.target = build.get("target")
+            config.target = build
+                .get("target")
                 .and_then(|v| v.as_str())
                 .unwrap_or("native")
                 .to_string();
@@ -131,11 +142,13 @@ impl ProjectConfig {
         // [profile.release]
         if let Some(profile) = root.get("profile").and_then(|v| v.as_table()) {
             if let Some(release) = profile.get("release").and_then(|v| v.as_table()) {
-                config.opt_level = release.get("opt_level")
+                config.opt_level = release
+                    .get("opt_level")
                     .and_then(|v| v.as_integer())
                     .map(|i| i as u8)
                     .unwrap_or(config.opt_level);
-                config.lto = release.get("lto")
+                config.lto = release
+                    .get("lto")
                     .and_then(|v| v.as_bool())
                     .unwrap_or(false);
             }
@@ -208,10 +221,19 @@ lto = true
         assert_eq!(config.version, "1.2.3");
         assert_eq!(config.description.as_deref(), Some("A test project"));
         assert_eq!(config.authors.len(), 2);
-        assert_eq!(config.main.as_ref().map(|p| p.to_str().unwrap()), Some("src/main.atom"));
+        assert_eq!(
+            config.main.as_ref().map(|p| p.to_str().unwrap()),
+            Some("src/main.atom")
+        );
         assert_eq!(config.dependencies.len(), 2);
-        assert_eq!(config.dependencies.get("json").map(|s| s.as_str()), Some("1.0.0"));
-        assert_eq!(config.dev_dependencies.get("test").map(|s| s.as_str()), Some("1.0.0"));
+        assert_eq!(
+            config.dependencies.get("json").map(|s| s.as_str()),
+            Some("1.0.0")
+        );
+        assert_eq!(
+            config.dev_dependencies.get("test").map(|s| s.as_str()),
+            Some("1.0.0")
+        );
         assert!(config.optimize);
         assert_eq!(config.target, "wasm");
         assert_eq!(config.opt_level, 3);

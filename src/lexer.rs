@@ -11,7 +11,12 @@ pub struct Span {
 
 impl Span {
     pub fn new(start: usize, line: usize, col: usize) -> Self {
-        Span { start, end: start, line, col }
+        Span {
+            start,
+            end: start,
+            line,
+            col,
+        }
     }
 
     pub fn with_end(mut self, end: usize) -> Self {
@@ -22,7 +27,12 @@ impl Span {
 
 impl Default for Span {
     fn default() -> Self {
-        Span { start: 0, end: 0, line: 1, col: 1 }
+        Span {
+            start: 0,
+            end: 0,
+            line: 1,
+            col: 1,
+        }
     }
 }
 
@@ -69,49 +79,49 @@ pub enum TokenKind {
     Ident(String),
 
     // Operators
-    Plus,        // +
-    Minus,       // -
-    Star,        // *
-    Slash,       // /
-    Percent,     // %
-    PlusEq,      // +=
-    MinusEq,     // -=
-    StarEq,      // *=
-    SlashEq,     // /=
-    PercentEq,   // %=
-    StarStar,    // **
-    Ampersand,   // &
-    Pipe,        // |
-    Caret,       // ^
-    Tilde,       // ~
-    Shl,         // <<
-    Shr,         // >>
-    Eq,          // =
-    EqEq,        // ==
-    Neq,         // !=
-    Lt,          // <
-    Gt,          // >
-    Lte,         // <=
-    Gte,         // >=
-    Arrow,       // ->
-    FatArrow,    // =>
-    Dot,         // .
-    DotDot,      // ..
-    DotDotLt,    // ..<
-    DotDotDot,   // ...
-    SafeDot,     // ?.
-    Colon,       // :
-    ColonColon,  // ::
-    Comma,       // ,
-    Semicolon,   // ;
-    LParen,      // (
-    RParen,      // )
-    LBrace,      // {
-    RBrace,      // }
-    LBracket,    // [
-    RBracket,    // ]
-    Underscore,  // _
-    Question,    // ?
+    Plus,       // +
+    Minus,      // -
+    Star,       // *
+    Slash,      // /
+    Percent,    // %
+    PlusEq,     // +=
+    MinusEq,    // -=
+    StarEq,     // *=
+    SlashEq,    // /=
+    PercentEq,  // %=
+    StarStar,   // **
+    Ampersand,  // &
+    Pipe,       // |
+    Caret,      // ^
+    Tilde,      // ~
+    Shl,        // <<
+    Shr,        // >>
+    Eq,         // =
+    EqEq,       // ==
+    Neq,        // !=
+    Lt,         // <
+    Gt,         // >
+    Lte,        // <=
+    Gte,        // >=
+    Arrow,      // ->
+    FatArrow,   // =>
+    Dot,        // .
+    DotDot,     // ..
+    DotDotLt,   // ..<
+    DotDotDot,  // ...
+    SafeDot,    // ?.
+    Colon,      // :
+    ColonColon, // ::
+    Comma,      // ,
+    Semicolon,  // ;
+    LParen,     // (
+    RParen,     // )
+    LBrace,     // {
+    RBrace,     // }
+    LBracket,   // [
+    RBracket,   // ]
+    Underscore, // _
+    Question,   // ?
 
     // Special
     Eof,
@@ -215,7 +225,10 @@ impl Token {
     }
 
     pub fn eof(span: Span) -> Self {
-        Token { kind: TokenKind::Eof, span }
+        Token {
+            kind: TokenKind::Eof,
+            span,
+        }
     }
 }
 
@@ -361,7 +374,7 @@ impl Lexer {
                 is_float = true;
                 num_str.push(self.advance().unwrap()); // '.'
                 num_str.push(self.advance().unwrap()); // first digit after .
-                // Continue reading digits
+                                                       // Continue reading digits
                 while let Some(ch) = self.current() {
                     if ch.is_ascii_digit() || ch == '_' {
                         num_str.push(self.advance().unwrap());
@@ -379,7 +392,12 @@ impl Lexer {
             let next = self.peek_next();
             let next_is_digit = next.map_or(false, |c| c.is_ascii_digit());
             let next_is_sign = next.map_or(false, |c| c == '+' || c == '-');
-            let next_is_digit_after_sign = next_is_sign && self.source.get(self.pos + 2).copied().map_or(false, |c| c.is_ascii_digit());
+            let next_is_digit_after_sign = next_is_sign
+                && self
+                    .source
+                    .get(self.pos + 2)
+                    .copied()
+                    .map_or(false, |c| c.is_ascii_digit());
             if next_is_digit || next_is_digit_after_sign {
                 is_float = true;
                 num_str.push(self.advance().unwrap()); // 'e' or 'E'
@@ -416,20 +434,43 @@ impl Lexer {
             } else if ch == '\\' {
                 self.advance(); // skip backslash
                 match self.current() {
-                    Some('n') => { s.push('\n'); self.advance(); }
-                    Some('t') => { s.push('\t'); self.advance(); }
-                    Some('r') => { s.push('\r'); self.advance(); }
-                    Some('\\') => { s.push('\\'); self.advance(); }
-                    Some('"') => { s.push('"'); self.advance(); }
-                    Some('0') => { s.push('\0'); self.advance(); }
-                    Some('$') => { s.push('$'); self.advance(); }
+                    Some('n') => {
+                        s.push('\n');
+                        self.advance();
+                    }
+                    Some('t') => {
+                        s.push('\t');
+                        self.advance();
+                    }
+                    Some('r') => {
+                        s.push('\r');
+                        self.advance();
+                    }
+                    Some('\\') => {
+                        s.push('\\');
+                        self.advance();
+                    }
+                    Some('"') => {
+                        s.push('"');
+                        self.advance();
+                    }
+                    Some('0') => {
+                        s.push('\0');
+                        self.advance();
+                    }
+                    Some('$') => {
+                        s.push('$');
+                        self.advance();
+                    }
                     Some('u') => {
                         self.advance(); // skip 'u'
                         if self.current() == Some('{') {
                             self.advance(); // skip '{'
                             let mut hex = String::new();
                             while let Some(c) = self.current() {
-                                if c == '}' { break; }
+                                if c == '}' {
+                                    break;
+                                }
                                 if c.is_ascii_hexdigit() {
                                     hex.push(self.advance().unwrap());
                                 } else {
@@ -444,7 +485,9 @@ impl Lexer {
                             }
                         }
                     }
-                    Some(_) => { self.advance(); } // skip unknown escape
+                    Some(_) => {
+                        self.advance();
+                    } // skip unknown escape
                     None => break,
                 }
             } else {
@@ -479,30 +522,60 @@ impl Lexer {
                 Some('\\') => {
                     self.advance();
                     match self.current() {
-                        Some('n') => { s.push('\n'); self.advance(); }
-                        Some('t') => { s.push('\t'); self.advance(); }
-                        Some('r') => { s.push('\r'); self.advance(); }
-                        Some('\\') => { s.push('\\'); self.advance(); }
-                        Some('"') => { s.push('"'); self.advance(); }
-                        Some('0') => { s.push('\0'); self.advance(); }
-                        Some('$') => { s.push('$'); self.advance(); }
+                        Some('n') => {
+                            s.push('\n');
+                            self.advance();
+                        }
+                        Some('t') => {
+                            s.push('\t');
+                            self.advance();
+                        }
+                        Some('r') => {
+                            s.push('\r');
+                            self.advance();
+                        }
+                        Some('\\') => {
+                            s.push('\\');
+                            self.advance();
+                        }
+                        Some('"') => {
+                            s.push('"');
+                            self.advance();
+                        }
+                        Some('0') => {
+                            s.push('\0');
+                            self.advance();
+                        }
+                        Some('$') => {
+                            s.push('$');
+                            self.advance();
+                        }
                         Some('u') => {
                             self.advance();
                             if self.current() == Some('{') {
                                 self.advance();
                                 let mut hex = String::new();
                                 while let Some(c) = self.current() {
-                                    if c == '}' { break; }
-                                    if c.is_ascii_hexdigit() { hex.push(self.advance().unwrap()); }
-                                    else { break; }
+                                    if c == '}' {
+                                        break;
+                                    }
+                                    if c.is_ascii_hexdigit() {
+                                        hex.push(self.advance().unwrap());
+                                    } else {
+                                        break;
+                                    }
                                 }
                                 self.advance();
                                 if let Ok(cp) = u32::from_str_radix(&hex, 16) {
-                                    if let Some(c) = char::from_u32(cp) { s.push(c); }
+                                    if let Some(c) = char::from_u32(cp) {
+                                        s.push(c);
+                                    }
                                 }
                             }
                         }
-                        Some(_) => { self.advance(); }
+                        Some(_) => {
+                            self.advance();
+                        }
                         None => break,
                     }
                 }
@@ -522,18 +595,28 @@ impl Lexer {
     /// The closing """ line's indentation determines the baseline.
     fn dedent_multiline(s: &str) -> String {
         let lines: Vec<&str> = s.lines().collect();
-        if lines.is_empty() { return String::new(); }
+        if lines.is_empty() {
+            return String::new();
+        }
         // Find minimum indentation among non-empty lines
         let min_indent = lines
             .iter()
             .filter(|l| !l.trim().is_empty())
-            .map(|l| l.chars().take_while(|c| c.is_whitespace() && *c != '\n').count())
+            .map(|l| {
+                l.chars()
+                    .take_while(|c| c.is_whitespace() && *c != '\n')
+                    .count()
+            })
             .min()
             .unwrap_or(0);
-        if min_indent == 0 { return s.to_string(); }
+        if min_indent == 0 {
+            return s.to_string();
+        }
         let mut result = String::new();
         for (i, line) in lines.iter().enumerate() {
-            if i > 0 { result.push('\n'); }
+            if i > 0 {
+                result.push('\n');
+            }
             if line.len() <= min_indent {
                 continue; // empty or whitespace-only line
             }
@@ -559,21 +642,47 @@ impl Lexer {
             Some('\\') => {
                 self.advance();
                 match self.current() {
-                    Some('n') => { self.advance(); '\n' }
-                    Some('t') => { self.advance(); '\t' }
-                    Some('r') => { self.advance(); '\r' }
-                    Some('\\') => { self.advance(); '\\' }
-                    Some('\'') => { self.advance(); '\'' }
-                    Some('0') => { self.advance(); '\0' }
-                    Some('$') => { self.advance(); '$' }
-                    Some('"') => { self.advance(); '"' }
+                    Some('n') => {
+                        self.advance();
+                        '\n'
+                    }
+                    Some('t') => {
+                        self.advance();
+                        '\t'
+                    }
+                    Some('r') => {
+                        self.advance();
+                        '\r'
+                    }
+                    Some('\\') => {
+                        self.advance();
+                        '\\'
+                    }
+                    Some('\'') => {
+                        self.advance();
+                        '\''
+                    }
+                    Some('0') => {
+                        self.advance();
+                        '\0'
+                    }
+                    Some('$') => {
+                        self.advance();
+                        '$'
+                    }
+                    Some('"') => {
+                        self.advance();
+                        '"'
+                    }
                     Some('u') => {
                         self.advance(); // skip 'u'
                         if self.current() == Some('{') {
                             self.advance(); // skip '{'
                             let mut hex = String::new();
                             while let Some(c) = self.current() {
-                                if c == '}' { break; }
+                                if c == '}' {
+                                    break;
+                                }
                                 if c.is_ascii_hexdigit() {
                                     hex.push(self.advance().unwrap());
                                 } else {
@@ -590,7 +699,10 @@ impl Lexer {
                             '?'
                         }
                     }
-                    Some(_) => { self.advance(); '?' }
+                    Some(_) => {
+                        self.advance();
+                        '?'
+                    }
                     None => return TokenKind::Underscore,
                 }
             }
@@ -656,17 +768,32 @@ impl Lexer {
     fn read_operator(&mut self, op: char) -> TokenKind {
         match op {
             '+' => match self.current() {
-                Some('=') => { self.advance(); TokenKind::PlusEq }
+                Some('=') => {
+                    self.advance();
+                    TokenKind::PlusEq
+                }
                 _ => TokenKind::Plus,
             },
             '-' => match self.current() {
-                Some('>') => { self.advance(); TokenKind::Arrow }
-                Some('=') => { self.advance(); TokenKind::MinusEq }
+                Some('>') => {
+                    self.advance();
+                    TokenKind::Arrow
+                }
+                Some('=') => {
+                    self.advance();
+                    TokenKind::MinusEq
+                }
                 _ => TokenKind::Minus,
             },
             '*' => match self.current() {
-                Some('=') => { self.advance(); TokenKind::StarEq }
-                Some('*') => { self.advance(); TokenKind::StarStar }
+                Some('=') => {
+                    self.advance();
+                    TokenKind::StarEq
+                }
+                Some('*') => {
+                    self.advance();
+                    TokenKind::StarStar
+                }
                 _ => TokenKind::Star,
             },
             '/' => match self.current() {
@@ -684,48 +811,87 @@ impl Lexer {
                     self.skip_block_comment();
                     return self.next_token_kind();
                 }
-                Some('=') => { self.advance(); TokenKind::SlashEq }
+                Some('=') => {
+                    self.advance();
+                    TokenKind::SlashEq
+                }
                 _ => TokenKind::Slash,
             },
             '%' => match self.current() {
-                Some('=') => { self.advance(); TokenKind::PercentEq }
+                Some('=') => {
+                    self.advance();
+                    TokenKind::PercentEq
+                }
                 _ => TokenKind::Percent,
             },
             '=' => match self.current() {
-                Some('=') => { self.advance(); TokenKind::EqEq }
-                Some('>') => { self.advance(); TokenKind::FatArrow }
+                Some('=') => {
+                    self.advance();
+                    TokenKind::EqEq
+                }
+                Some('>') => {
+                    self.advance();
+                    TokenKind::FatArrow
+                }
                 _ => TokenKind::Eq,
             },
             '!' => match self.current() {
-                Some('=') => { self.advance(); TokenKind::Neq }
+                Some('=') => {
+                    self.advance();
+                    TokenKind::Neq
+                }
                 _ => TokenKind::Not,
             },
             '<' => match self.current() {
-                Some('=') => { self.advance(); TokenKind::Lte }
-                Some('<') => { self.advance(); TokenKind::Shl }
+                Some('=') => {
+                    self.advance();
+                    TokenKind::Lte
+                }
+                Some('<') => {
+                    self.advance();
+                    TokenKind::Shl
+                }
                 _ => TokenKind::Lt,
             },
             '>' => match self.current() {
-                Some('=') => { self.advance(); TokenKind::Gte }
-                Some('>') => { self.advance(); TokenKind::Shr }
+                Some('=') => {
+                    self.advance();
+                    TokenKind::Gte
+                }
+                Some('>') => {
+                    self.advance();
+                    TokenKind::Shr
+                }
                 _ => TokenKind::Gt,
             },
             '?' => match self.current() {
-                Some('.') => { self.advance(); TokenKind::SafeDot }
+                Some('.') => {
+                    self.advance();
+                    TokenKind::SafeDot
+                }
                 _ => TokenKind::Question,
             },
             '&' => match self.current() {
-                Some('&') => { self.advance(); TokenKind::And }
+                Some('&') => {
+                    self.advance();
+                    TokenKind::And
+                }
                 _ => TokenKind::Ampersand,
             },
             '|' => match self.current() {
-                Some('|') => { self.advance(); TokenKind::Or }
+                Some('|') => {
+                    self.advance();
+                    TokenKind::Or
+                }
                 _ => TokenKind::Pipe,
             },
             '^' => TokenKind::Caret,
             '~' => TokenKind::Tilde,
             ':' => match self.current() {
-                Some(':') => { self.advance(); TokenKind::ColonColon }
+                Some(':') => {
+                    self.advance();
+                    TokenKind::ColonColon
+                }
                 _ => TokenKind::Colon,
             },
             '.' => match self.current() {
@@ -774,14 +940,16 @@ impl Lexer {
                 let c1 = self.advance(); // consume first "
                 let c2 = self.advance(); // consume second "
                 let c3 = self.current(); // peek third "
-                // Restore position
+                                         // Restore position
                 self.pos = saved_pos;
                 self.line = saved_line;
                 self.col = saved_col;
                 c1 == Some('"') && c2 == Some('"') && c3 == Some('"')
             };
             if is_triple {
-                self.advance(); self.advance(); self.advance(); // skip """
+                self.advance();
+                self.advance();
+                self.advance(); // skip """
                 return self.read_multiline_string();
             }
             return self.read_string();
@@ -970,6 +1138,9 @@ mod tests {
     #[test]
     fn test_string_escapes() {
         let tokens = tokenize("\"hello\\nworld\"");
-        assert_eq!(tokens[0], TokenKind::StringLiteral("hello\nworld".to_string()));
+        assert_eq!(
+            tokens[0],
+            TokenKind::StringLiteral("hello\nworld".to_string())
+        );
     }
 }

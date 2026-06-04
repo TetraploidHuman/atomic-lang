@@ -26,8 +26,7 @@ pub struct EnumVariantInfo {
     pub params: Vec<EnumVariantParam>,
 }
 
-#[derive(Default)]
-#[derive(Clone)]
+#[derive(Default, Clone)]
 pub struct TypeRegistry {
     pub structs: HashMap<String, StructInfo>,
     pub enums: HashMap<String, EnumInfo>,
@@ -47,21 +46,31 @@ impl TypeRegistry {
 
     pub fn register(&mut self, stmt: &Stmt) -> Result<(), String> {
         match stmt {
-            Stmt::TypeAlias { name, definition, .. } => {
+            Stmt::TypeAlias {
+                name, definition, ..
+            } => {
                 if let Type::Struct(fields) = definition {
                     let mut field_index = HashMap::new();
                     for (i, (fname, _)) in fields.iter().enumerate() {
                         field_index.insert(fname.clone(), i);
                     }
-                    self.structs.insert(name.clone(), StructInfo {
-                        name: name.clone(),
-                        fields: fields.clone(),
-                        field_index,
-                    });
+                    self.structs.insert(
+                        name.clone(),
+                        StructInfo {
+                            name: name.clone(),
+                            fields: fields.clone(),
+                            field_index,
+                        },
+                    );
                 }
                 self.type_aliases.insert(name.clone(), definition.clone());
             }
-            Stmt::Enum { name, type_params, variants, .. } => {
+            Stmt::Enum {
+                name,
+                type_params,
+                variants,
+                ..
+            } => {
                 let mut enum_variants = Vec::new();
                 for (i, v) in variants.iter().enumerate() {
                     self.variant_to_enum.insert(v.name.clone(), name.clone());
@@ -71,19 +80,25 @@ impl TypeRegistry {
                         params: v.params.clone(),
                     });
                 }
-                self.enums.insert(name.clone(), EnumInfo {
-                    name: name.clone(),
-                    type_params: type_params.clone(),
-                    variants: enum_variants,
-                });
+                self.enums.insert(
+                    name.clone(),
+                    EnumInfo {
+                        name: name.clone(),
+                        type_params: type_params.clone(),
+                        variants: enum_variants,
+                    },
+                );
             }
             Stmt::ExternalType { name, .. } => {
                 // Register as opaque struct (no fields)
-                self.structs.insert(name.clone(), StructInfo {
-                    name: name.clone(),
-                    fields: vec![],
-                    field_index: HashMap::new(),
-                });
+                self.structs.insert(
+                    name.clone(),
+                    StructInfo {
+                        name: name.clone(),
+                        fields: vec![],
+                        field_index: HashMap::new(),
+                    },
+                );
             }
             _ => {}
         }
@@ -92,11 +107,24 @@ impl TypeRegistry {
 
     /// Find the struct type whose field names match exactly. Returns the struct info if unique.
     pub fn find_struct_by_fields(&self, field_names: &[String]) -> Option<&StructInfo> {
-        let matches: Vec<&StructInfo> = self.structs.values().filter(|s| {
-            if s.fields.len() != field_names.len() { return false; }
-            field_names.iter().enumerate().all(|(i, name)| s.fields[i].0 == *name)
-        }).collect();
-        if matches.len() == 1 { Some(matches[0]) } else { None }
+        let matches: Vec<&StructInfo> = self
+            .structs
+            .values()
+            .filter(|s| {
+                if s.fields.len() != field_names.len() {
+                    return false;
+                }
+                field_names
+                    .iter()
+                    .enumerate()
+                    .all(|(i, name)| s.fields[i].0 == *name)
+            })
+            .collect();
+        if matches.len() == 1 {
+            Some(matches[0])
+        } else {
+            None
+        }
     }
 
     /// Look up an enum variant by name. Returns (enum_info, variant_info).
@@ -124,14 +152,21 @@ impl TypeRegistry {
         let mut has_wildcard = false;
 
         for arm in arms {
-            self.collect_pattern_coverage(&arm.pattern, &mut covered, &mut enum_name, &mut has_wildcard);
+            self.collect_pattern_coverage(
+                &arm.pattern,
+                &mut covered,
+                &mut enum_name,
+                &mut has_wildcard,
+            );
         }
 
         if has_wildcard || enum_name.is_none() {
             return Ok(());
         }
 
-        let info = self.enums.get(enum_name.as_ref().unwrap())
+        let info = self
+            .enums
+            .get(enum_name.as_ref().unwrap())
             .ok_or_else(|| format!("Unknown enum type: {}", enum_name.unwrap()))?;
 
         let mut missing: Vec<&str> = Vec::new();
@@ -144,7 +179,8 @@ impl TypeRegistry {
         if missing.is_empty() {
             Ok(())
         } else {
-            let msg = missing.iter()
+            let msg = missing
+                .iter()
                 .map(|n| format!("'{}'", n))
                 .collect::<Vec<_>>()
                 .join(", ");
@@ -166,7 +202,11 @@ impl TypeRegistry {
             Pattern::Wildcard | Pattern::Variable(_) => {
                 *has_wildcard = true;
             }
-            Pattern::Constructor { name, args, named_fields } => {
+            Pattern::Constructor {
+                name,
+                args,
+                named_fields,
+            } => {
                 if let Some(en) = self.variant_to_enum.get(name.as_str()) {
                     if enum_name.is_none() {
                         *enum_name = Some(en.clone());
@@ -202,7 +242,11 @@ pub struct TypeChecker {
 
 impl TypeChecker {
     pub fn new(registry: TypeRegistry) -> Self {
-        TypeChecker { registry, type_env: HashMap::new(), current_span: Span::default() }
+        TypeChecker {
+            registry,
+            type_env: HashMap::new(),
+            current_span: Span::default(),
+        }
     }
 
     /// Build the type environment from top-level statements
@@ -224,8 +268,14 @@ impl TypeChecker {
 
         for stmt in &program.stmts {
             match stmt {
-                Stmt::Fun { name, params, return_type, .. } => {
-                    let param_tys: Vec<Type> = params.iter()
+                Stmt::Fun {
+                    name,
+                    params,
+                    return_type,
+                    ..
+                } => {
+                    let param_tys: Vec<Type> = params
+                        .iter()
                         .map(|p| p.ty.clone().unwrap_or(Type::Named("Int".into())))
                         .collect();
                     let ret_ty = return_type.clone().unwrap_or(Type::Named("Int".into()));
@@ -234,26 +284,41 @@ impl TypeChecker {
                     let all_typed = params.iter().all(|p| p.ty.is_some());
                     if all_typed && overloaded_names.contains(name.as_str()) {
                         // Use mangled name as key for overloaded functions
-                        let mangled = Self::mangle_name(name, &params.iter()
-                            .map(|p| p.ty.clone().unwrap_or(Type::Named("Int".into())))
-                            .collect::<Vec<_>>());
+                        let mangled = Self::mangle_name(
+                            name,
+                            &params
+                                .iter()
+                                .map(|p| p.ty.clone().unwrap_or(Type::Named("Int".into())))
+                                .collect::<Vec<_>>(),
+                        );
                         self.type_env.insert(mangled, fn_type);
                     } else {
                         // Also store under original name for backward compat
                         self.type_env.insert(name.clone(), fn_type);
                     }
                 }
-                Stmt::Let { name, type_ann, value, .. } => {
+                Stmt::Let {
+                    name,
+                    type_ann,
+                    value,
+                    ..
+                } => {
                     let inferred = self.infer_expr_type(value);
                     let ty = type_ann.clone().unwrap_or(inferred);
                     self.type_env.insert(name.clone(), ty);
                 }
                 Stmt::Destructure { names, .. } => {
                     for name in names {
-                        self.type_env.insert(name.clone(), Type::Named("Int".into()));
+                        self.type_env
+                            .insert(name.clone(), Type::Named("Int".into()));
                     }
                 }
-                Stmt::Const { name, type_ann, value, .. } => {
+                Stmt::Const {
+                    name,
+                    type_ann,
+                    value,
+                    ..
+                } => {
                     let inferred = self.infer_expr_type(value);
                     let ty = type_ann.clone().unwrap_or(inferred);
                     self.type_env.insert(name.clone(), ty);
@@ -280,7 +345,13 @@ impl TypeChecker {
         for stmt in &program.stmts {
             self.current_span = stmt.span();
             match stmt {
-                Stmt::Fun { name, params, return_type, body, .. } => {
+                Stmt::Fun {
+                    name,
+                    params,
+                    return_type,
+                    body,
+                    ..
+                } => {
                     // Temporarily add function parameters to the type environment
                     let mut saved: Vec<(String, Option<Type>)> = Vec::new();
                     for p in params {
@@ -295,7 +366,8 @@ impl TypeChecker {
                         let inferred = self.infer_expr_type(body);
                         // Skip check when inferred type is Int (fallback for unknown types)
                         if !matches!(&inferred, Type::Named(n) if n == "Int")
-                            && !self.types_compatible(declared_ret, &inferred) {
+                            && !self.types_compatible(declared_ret, &inferred)
+                        {
                             errors.push(CompilerError::new(
                                 format!("Function '{}' declares return type '{}' but body has type '{}'",
                                     name, declared_ret, inferred)
@@ -315,30 +387,46 @@ impl TypeChecker {
                 Stmt::Expr { expr, .. } => {
                     self.collect_expr_errors(expr, &mut errors);
                 }
-                Stmt::Let { name, type_ann, value, .. } => {
+                Stmt::Let {
+                    name,
+                    type_ann,
+                    value,
+                    ..
+                } => {
                     self.collect_expr_errors(value, &mut errors);
                     if let Some(ann) = type_ann {
                         let inferred = self.infer_expr_type(value);
                         if !self.types_compatible(ann, &inferred) {
-                            errors.push(CompilerError::new(
-                                format!("Variable '{}' declared as '{}' but initialized with '{}'",
-                                    name, ann, inferred)
-                            ).with_span(self.current_span));
+                            errors.push(
+                                CompilerError::new(format!(
+                                    "Variable '{}' declared as '{}' but initialized with '{}'",
+                                    name, ann, inferred
+                                ))
+                                .with_span(self.current_span),
+                            );
                         }
                     }
                 }
                 Stmt::Destructure { value, .. } => {
                     self.collect_expr_errors(value, &mut errors);
                 }
-                Stmt::Const { name, type_ann, value, .. } => {
+                Stmt::Const {
+                    name,
+                    type_ann,
+                    value,
+                    ..
+                } => {
                     self.collect_expr_errors(value, &mut errors);
                     if let Some(ann) = type_ann {
                         let inferred = self.infer_expr_type(value);
                         if !self.types_compatible(ann, &inferred) {
-                            errors.push(CompilerError::new(
-                                format!("Constant '{}' declared as '{}' but initialized with '{}'",
-                                    name, ann, inferred)
-                            ).with_span(self.current_span));
+                            errors.push(
+                                CompilerError::new(format!(
+                                    "Constant '{}' declared as '{}' but initialized with '{}'",
+                                    name, ann, inferred
+                                ))
+                                .with_span(self.current_span),
+                            );
                         }
                     }
                 }
@@ -378,7 +466,11 @@ impl TypeChecker {
                     }
                 }
             }
-            Expr::Call { func, args, trailing_lambda } => {
+            Expr::Call {
+                func,
+                args,
+                trailing_lambda,
+            } => {
                 if let Err(e) = self.check_call(func, args) {
                     errors.push(e);
                 }
@@ -395,15 +487,13 @@ impl TypeChecker {
                     self.collect_stmt_errors(s, errors);
                 }
             }
-            Expr::For(for_expr) => {
-                match &for_expr.kind {
-                    ForKind::Iterate { body, .. } => self.collect_expr_errors(body, errors),
-                    ForKind::IterateWithIndex { body, .. } => self.collect_expr_errors(body, errors),
-                    ForKind::Condition { body, .. } => self.collect_expr_errors(body, errors),
-                    ForKind::Infinite { body, .. } => self.collect_expr_errors(body, errors),
-                    ForKind::NestedIterate { body, .. } => self.collect_expr_errors(body, errors),
-                }
-            }
+            Expr::For(for_expr) => match &for_expr.kind {
+                ForKind::Iterate { body, .. } => self.collect_expr_errors(body, errors),
+                ForKind::IterateWithIndex { body, .. } => self.collect_expr_errors(body, errors),
+                ForKind::Condition { body, .. } => self.collect_expr_errors(body, errors),
+                ForKind::Infinite { body, .. } => self.collect_expr_errors(body, errors),
+                ForKind::NestedIterate { body, .. } => self.collect_expr_errors(body, errors),
+            },
             Expr::Lambda { body, .. } => {
                 self.collect_expr_errors(body, errors);
             }
@@ -426,7 +516,9 @@ impl TypeChecker {
     fn collect_stmt_errors(&self, stmt: &Stmt, errors: &mut Vec<CompilerError>) {
         match stmt {
             Stmt::Expr { expr, .. } => self.collect_expr_errors(expr, errors),
-            Stmt::Let { value, .. } | Stmt::Destructure { value, .. } | Stmt::Const { value, .. } => {
+            Stmt::Let { value, .. }
+            | Stmt::Destructure { value, .. }
+            | Stmt::Const { value, .. } => {
                 self.collect_expr_errors(value, errors);
             }
             Stmt::Return { value: expr, .. } => {
@@ -456,8 +548,14 @@ impl TypeChecker {
                 if ls == "String" || rs == "String" || ls == "Bool" || rs == "Bool" {
                     return Err(CompilerError::new(format!(
                         "Arithmetic operation '{}' not supported for {}",
-                        op, if ls == "Bool" || rs == "Bool" { "Bool" } else { "String" }
-                    )).with_span(self.current_span));
+                        op,
+                        if ls == "Bool" || rs == "Bool" {
+                            "Bool"
+                        } else {
+                            "String"
+                        }
+                    ))
+                    .with_span(self.current_span));
                 }
             }
             BinaryOp::Eq | BinaryOp::Neq => {
@@ -468,28 +566,42 @@ impl TypeChecker {
                 let rs = format!("{}", rt);
                 // Allow Bool comparison (True > False), but disallow mixed Bool/other types
                 if (ls == "Bool" || rs == "Bool") && ls != rs {
-                    return Err(CompilerError::new(format!("Cannot compare '{}' with '{}'", ls, rs))
-                        .with_span(self.current_span));
+                    return Err(CompilerError::new(format!(
+                        "Cannot compare '{}' with '{}'",
+                        ls, rs
+                    ))
+                    .with_span(self.current_span));
                 }
             }
             BinaryOp::And | BinaryOp::Or => {
                 if format!("{}", lt) != "Bool" || format!("{}", rt) != "Bool" {
                     return Err(CompilerError::new(format!(
-                        "Logical operator '{}' requires Bool operands, got '{}' and '{}'", op, lt, rt
-                    )).with_span(self.current_span));
+                        "Logical operator '{}' requires Bool operands, got '{}' and '{}'",
+                        op, lt, rt
+                    ))
+                    .with_span(self.current_span));
                 }
             }
-            BinaryOp::BitAnd | BinaryOp::BitOr | BinaryOp::BitXor | BinaryOp::Shl | BinaryOp::Shr => {
+            BinaryOp::BitAnd
+            | BinaryOp::BitOr
+            | BinaryOp::BitXor
+            | BinaryOp::Shl
+            | BinaryOp::Shr => {
                 let ls = format!("{}", lt);
                 let rs = format!("{}", rt);
                 if ls != "Int" || rs != "Int" {
                     return Err(CompilerError::new(format!(
-                        "Bitwise operator '{}' requires Int operands, got '{}' and '{}'", op, lt, rs
-                    )).with_span(self.current_span));
+                        "Bitwise operator '{}' requires Int operands, got '{}' and '{}'",
+                        op, lt, rs
+                    ))
+                    .with_span(self.current_span));
                 }
             }
-            BinaryOp::Range | BinaryOp::RangeExclusive | BinaryOp::Assign
-            | BinaryOp::In | BinaryOp::Is => {}
+            BinaryOp::Range
+            | BinaryOp::RangeExclusive
+            | BinaryOp::Assign
+            | BinaryOp::In
+            | BinaryOp::Is => {}
         }
         Ok(())
     }
@@ -503,7 +615,8 @@ impl TypeChecker {
                     return Err(CompilerError::new(format!(
                         "Enum variant '{}' expects {} arguments, but got {}",
                         name, expected, actual
-                    )).with_span(self.current_span));
+                    ))
+                    .with_span(self.current_span));
                 }
             }
         }
@@ -516,9 +629,7 @@ impl TypeChecker {
         }
 
         // Collect arm types, but be lenient with Int (fallback) when mixed with enums
-        let types: Vec<Type> = arms.iter()
-            .map(|a| self.infer_expr_type(&a.body))
-            .collect();
+        let types: Vec<Type> = arms.iter().map(|a| self.infer_expr_type(&a.body)).collect();
         let first = &types[0];
 
         // If first type is Int, it might be a fallback — skip arm checking
@@ -534,8 +645,11 @@ impl TypeChecker {
             if !self.types_compatible(first, t) {
                 return Err(CompilerError::new(format!(
                     "When arm type mismatch: arm 1 is '{}' but arm {} is '{}'",
-                    first, i + 1, t
-                )).with_span(self.current_span));
+                    first,
+                    i + 1,
+                    t
+                ))
+                .with_span(self.current_span));
             }
         }
         Ok(())
@@ -544,7 +658,9 @@ impl TypeChecker {
     /// Infer the type of an expression (structural, not full HM inference)
     fn infer_expr_type(&self, expr: &Expr) -> Type {
         match expr {
-            Expr::Literal(Literal::String(_)) | Expr::StringInterpolate(_) => Type::Named("String".into()),
+            Expr::Literal(Literal::String(_)) | Expr::StringInterpolate(_) => {
+                Type::Named("String".into())
+            }
             Expr::Literal(Literal::Int(_)) => Type::Named("Int".into()),
             Expr::Literal(Literal::Float(_)) => Type::Named("Float".into()),
             Expr::Literal(Literal::Bool(_)) => Type::Named("Bool".into()),
@@ -559,29 +675,46 @@ impl TypeChecker {
                 let lt = self.infer_expr_type(lhs);
                 let rt = self.infer_expr_type(rhs);
                 if *op == BinaryOp::Add {
-                    if matches!(&lt, Type::Named(ref n) if n == "String") || matches!(&rt, Type::Named(ref n) if n == "String") {
+                    if matches!(&lt, Type::Named(ref n) if n == "String")
+                        || matches!(&rt, Type::Named(ref n) if n == "String")
+                    {
                         return Type::Named("String".into());
                     }
                 }
-                if *op == BinaryOp::And || *op == BinaryOp::Or || *op == BinaryOp::Eq ||
-                   *op == BinaryOp::Neq || *op == BinaryOp::Lt || *op == BinaryOp::Gt ||
-                   *op == BinaryOp::Lte || *op == BinaryOp::Gte ||
-                   *op == BinaryOp::In || *op == BinaryOp::Is {
+                if *op == BinaryOp::And
+                    || *op == BinaryOp::Or
+                    || *op == BinaryOp::Eq
+                    || *op == BinaryOp::Neq
+                    || *op == BinaryOp::Lt
+                    || *op == BinaryOp::Gt
+                    || *op == BinaryOp::Lte
+                    || *op == BinaryOp::Gte
+                    || *op == BinaryOp::In
+                    || *op == BinaryOp::Is
+                {
                     return Type::Named("Bool".into());
                 }
-                if *op == BinaryOp::BitAnd || *op == BinaryOp::BitOr || *op == BinaryOp::BitXor ||
-                   *op == BinaryOp::Shl || *op == BinaryOp::Shr {
+                if *op == BinaryOp::BitAnd
+                    || *op == BinaryOp::BitOr
+                    || *op == BinaryOp::BitXor
+                    || *op == BinaryOp::Shl
+                    || *op == BinaryOp::Shr
+                {
                     return Type::Named("Int".into());
                 }
                 if *op == BinaryOp::Pow {
                     // Return Float if either operand is Float
-                    if matches!(&lt, Type::Named(ref n) if n == "Float") || matches!(&rt, Type::Named(ref n) if n == "Float") {
+                    if matches!(&lt, Type::Named(ref n) if n == "Float")
+                        || matches!(&rt, Type::Named(ref n) if n == "Float")
+                    {
                         return Type::Named("Float".into());
                     }
                     return lt;
                 }
                 // Arithmetic: return Float if either operand is Float, else Int
-                if matches!(&lt, Type::Named(ref n) if n == "Float") || matches!(&rt, Type::Named(ref n) if n == "Float") {
+                if matches!(&lt, Type::Named(ref n) if n == "Float")
+                    || matches!(&rt, Type::Named(ref n) if n == "Float")
+                {
                     return Type::Named("Float".into());
                 }
                 Type::Named("Int".into())
@@ -604,7 +737,10 @@ impl TypeChecker {
                         "take_while" | "drop_while" | "sorted_by" => Type::Named("List".into()),
                         _ => {
                             if self.registry.lookup_variant(name).is_some() {
-                                let enum_name = self.registry.variant_to_enum.get(name)
+                                let enum_name = self
+                                    .registry
+                                    .variant_to_enum
+                                    .get(name)
                                     .cloned()
                                     .unwrap_or_default();
                                 Type::Named(enum_name)
@@ -619,18 +755,23 @@ impl TypeChecker {
                     let recv_type = self.infer_expr_type(receiver);
                     match (recv_type, method.as_str()) {
                         // Map/Set UFCS methods
-                        (Type::Map(_, _), "contains") | (Type::Set(_), "contains")
-                            | (Type::Map(_, _), "is_empty") | (Type::Set(_), "is_empty") => Type::Named("Bool".into()),
+                        (Type::Map(_, _), "contains")
+                        | (Type::Set(_), "contains")
+                        | (Type::Map(_, _), "is_empty")
+                        | (Type::Set(_), "is_empty") => Type::Named("Bool".into()),
                         (Type::Map(_, _), "insert") | (Type::Set(_), "insert") => Type::Unit,
-                        (Type::Map(_, _), "remove") | (Type::Map(_, _), "get")
-                            | (Type::Set(_), "remove") => Type::Named("Option".into()),
+                        (Type::Map(_, _), "remove")
+                        | (Type::Map(_, _), "get")
+                        | (Type::Set(_), "remove") => Type::Named("Option".into()),
                         // Stream UFCS methods
                         (Type::Stream(_), "send") => Type::Unit,
                         (Type::Stream(_), "receive") => Type::Named("Int".into()),
                         (Type::Stream(_), "close") => Type::Unit,
                         // Task UFCS methods
                         (Type::Task(_), "cancel") => Type::Unit,
-                        (Type::Task(_), "is_done") | (Type::Task(_), "is_cancelled") => Type::Named("Bool".into()),
+                        (Type::Task(_), "is_done") | (Type::Task(_), "is_cancelled") => {
+                            Type::Named("Bool".into())
+                        }
                         (Type::Task(_), "wait") => Type::Named("Int".into()),
                         _ => Type::Named("Int".into()),
                     }
@@ -650,7 +791,10 @@ impl TypeChecker {
                 if let Some(ty) = self.type_env.get(name) {
                     ty.clone()
                 } else {
-                    Type::Function(vec![Type::Named("Int".into())], Box::new(Type::Named("Int".into())))
+                    Type::Function(
+                        vec![Type::Named("Int".into())],
+                        Box::new(Type::Named("Int".into())),
+                    )
                 }
             }
             Expr::Copy(inner) => self.infer_expr_type(inner),
@@ -661,19 +805,25 @@ impl TypeChecker {
                 self.infer_expr_type(inner)
             }
             Expr::Unsafe(inner) => self.infer_expr_type(inner),
-            Expr::Block(stmts) => {
-                stmts.last().map(|s| match s {
+            Expr::Block(stmts) => stmts
+                .last()
+                .map(|s| match s {
                     Stmt::Expr { expr: e, .. } => self.infer_expr_type(e),
-                    Stmt::Return { value: e, .. } => e.as_ref()
+                    Stmt::Return { value: e, .. } => e
+                        .as_ref()
                         .map(|re| self.infer_expr_type(re))
                         .unwrap_or(Type::Unit),
                     _ => Type::Unit,
-                }).unwrap_or(Type::Unit)
-            }
+                })
+                .unwrap_or(Type::Unit),
             Expr::Ident(name) => {
                 if self.registry.lookup_variant(name).is_some() {
-                    let enum_name = self.registry.variant_to_enum.get(name)
-                        .cloned().unwrap_or_default();
+                    let enum_name = self
+                        .registry
+                        .variant_to_enum
+                        .get(name)
+                        .cloned()
+                        .unwrap_or_default();
                     Type::Named(enum_name)
                 } else if let Some(ty) = self.type_env.get(name) {
                     ty.clone()
@@ -704,7 +854,9 @@ impl TypeChecker {
         match (declared, inferred) {
             (Type::Unit, _) | (_, Type::Unit) => true,
             (Type::Named(a), Type::Named(b)) => {
-                if a == b { return true; }
+                if a == b {
+                    return true;
+                }
                 // Normalize type aliases: Str=String, Double=Float
                 let norm_a = match a.as_str() {
                     "Str" => "String",
@@ -719,19 +871,26 @@ impl TypeChecker {
                 norm_a == norm_b
             }
             (Type::Struct(fa), Type::Struct(fb)) => {
-                if fa.len() != fb.len() { return false; }
-                fa.iter().zip(fb.iter()).all(|((na, ta), (nb, tb))| {
-                    na == nb && self.types_compatible(ta, tb)
-                })
+                if fa.len() != fb.len() {
+                    return false;
+                }
+                fa.iter()
+                    .zip(fb.iter())
+                    .all(|((na, ta), (nb, tb))| na == nb && self.types_compatible(ta, tb))
             }
-            (Type::Map(ka, va), Type::Map(kb, vb)) =>
-                self.types_compatible(ka, kb) && self.types_compatible(va, vb),
+            (Type::Map(ka, va), Type::Map(kb, vb)) => {
+                self.types_compatible(ka, kb) && self.types_compatible(va, vb)
+            }
             (Type::Set(ea), Type::Set(eb)) => self.types_compatible(ea, eb),
             (Type::Task(ta), Type::Task(tb)) => self.types_compatible(ta, tb),
             (Type::Stream(sa), Type::Stream(sb)) => self.types_compatible(sa, sb),
             (Type::Function(pa, ra), Type::Function(pb, rb)) => {
-                if pa.len() != pb.len() { return false; }
-                pa.iter().zip(pb.iter()).all(|(a, b)| self.types_compatible(a, b))
+                if pa.len() != pb.len() {
+                    return false;
+                }
+                pa.iter()
+                    .zip(pb.iter())
+                    .all(|(a, b)| self.types_compatible(a, b))
                     && self.types_compatible(ra, rb)
             }
             _ => true,

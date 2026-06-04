@@ -210,5 +210,8 @@ fn test_multiline() {
 
 #[test]
 fn test_interp() {
-    assert_eq!(run_example("interp.at"), "Hello, World!Age: 42World is 42 years olddone");
+    assert_eq!(
+        run_example("interp.at"),
+        "Hello, World!Age: 42World is 42 years olddone"
+    );
 }

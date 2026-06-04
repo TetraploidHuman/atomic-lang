@@ -38,7 +38,6 @@ use inkwell::types::{BasicMetadataTypeEnum, BasicTypeEnum, FunctionType, StructT
 use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, IntValue, PointerValue};
 use std::collections::{HashMap, HashSet};
 
-
 // ---- Scope ----
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub(super) enum ValKind {
@@ -89,28 +88,142 @@ pub(super) struct Scope<'ctx> {
 
 impl<'ctx> Scope<'ctx> {
     fn new() -> Self {
-        Scope { variables: HashMap::new(), parent: None }
+        Scope {
+            variables: HashMap::new(),
+            parent: None,
+        }
     }
     fn with_parent(parent: Scope<'ctx>) -> Self {
-        Scope { variables: HashMap::new(), parent: Some(Box::new(parent)) }
+        Scope {
+            variables: HashMap::new(),
+            parent: Some(Box::new(parent)),
+        }
     }
     fn get(&self, name: &str) -> Option<&ScopeVar<'ctx>> {
-        self.variables.get(name).or_else(|| self.parent.as_ref().and_then(|p| p.get(name)))
+        self.variables
+            .get(name)
+            .or_else(|| self.parent.as_ref().and_then(|p| p.get(name)))
     }
-    fn set(&mut self, name: String, ptr: PointerValue<'ctx>, ty: inkwell::types::BasicTypeEnum<'ctx>, kind: ValKind) {
-        self.variables.insert(name, ScopeVar { ptr, ty, kind, fn_type: None, mutable: false, lazy_flag: None, lazy_init_expr: None, ast_type: None, enum_inner_type: None, enum_data_rc_managed: false });
+    fn set(
+        &mut self,
+        name: String,
+        ptr: PointerValue<'ctx>,
+        ty: inkwell::types::BasicTypeEnum<'ctx>,
+        kind: ValKind,
+    ) {
+        self.variables.insert(
+            name,
+            ScopeVar {
+                ptr,
+                ty,
+                kind,
+                fn_type: None,
+                mutable: false,
+                lazy_flag: None,
+                lazy_init_expr: None,
+                ast_type: None,
+                enum_inner_type: None,
+                enum_data_rc_managed: false,
+            },
+        );
     }
-    fn set_with_fn_type(&mut self, name: String, ptr: PointerValue<'ctx>, ty: inkwell::types::BasicTypeEnum<'ctx>, kind: ValKind, fn_type: Option<FunctionType<'ctx>>) {
-        self.variables.insert(name, ScopeVar { ptr, ty, kind, fn_type, mutable: false, lazy_flag: None, lazy_init_expr: None, ast_type: None, enum_inner_type: None, enum_data_rc_managed: false });
+    fn set_with_fn_type(
+        &mut self,
+        name: String,
+        ptr: PointerValue<'ctx>,
+        ty: inkwell::types::BasicTypeEnum<'ctx>,
+        kind: ValKind,
+        fn_type: Option<FunctionType<'ctx>>,
+    ) {
+        self.variables.insert(
+            name,
+            ScopeVar {
+                ptr,
+                ty,
+                kind,
+                fn_type,
+                mutable: false,
+                lazy_flag: None,
+                lazy_init_expr: None,
+                ast_type: None,
+                enum_inner_type: None,
+                enum_data_rc_managed: false,
+            },
+        );
     }
-    fn set_mutable(&mut self, name: String, ptr: PointerValue<'ctx>, ty: inkwell::types::BasicTypeEnum<'ctx>, kind: ValKind, fn_type: Option<FunctionType<'ctx>>) {
-        self.variables.insert(name, ScopeVar { ptr, ty, kind, fn_type, mutable: true, lazy_flag: None, lazy_init_expr: None, ast_type: None, enum_inner_type: None, enum_data_rc_managed: false });
+    fn set_mutable(
+        &mut self,
+        name: String,
+        ptr: PointerValue<'ctx>,
+        ty: inkwell::types::BasicTypeEnum<'ctx>,
+        kind: ValKind,
+        fn_type: Option<FunctionType<'ctx>>,
+    ) {
+        self.variables.insert(
+            name,
+            ScopeVar {
+                ptr,
+                ty,
+                kind,
+                fn_type,
+                mutable: true,
+                lazy_flag: None,
+                lazy_init_expr: None,
+                ast_type: None,
+                enum_inner_type: None,
+                enum_data_rc_managed: false,
+            },
+        );
     }
-    fn set_lazy(&mut self, name: String, ptr: PointerValue<'ctx>, ty: inkwell::types::BasicTypeEnum<'ctx>, kind: ValKind, flag: PointerValue<'ctx>, init_expr: Expr) {
-        self.variables.insert(name, ScopeVar { ptr, ty, kind, fn_type: None, mutable: false, lazy_flag: Some(flag), lazy_init_expr: Some(init_expr), ast_type: None, enum_inner_type: None, enum_data_rc_managed: false });
+    fn set_lazy(
+        &mut self,
+        name: String,
+        ptr: PointerValue<'ctx>,
+        ty: inkwell::types::BasicTypeEnum<'ctx>,
+        kind: ValKind,
+        flag: PointerValue<'ctx>,
+        init_expr: Expr,
+    ) {
+        self.variables.insert(
+            name,
+            ScopeVar {
+                ptr,
+                ty,
+                kind,
+                fn_type: None,
+                mutable: false,
+                lazy_flag: Some(flag),
+                lazy_init_expr: Some(init_expr),
+                ast_type: None,
+                enum_inner_type: None,
+                enum_data_rc_managed: false,
+            },
+        );
     }
-    fn set_with_ast_type(&mut self, name: String, ptr: PointerValue<'ctx>, ty: inkwell::types::BasicTypeEnum<'ctx>, kind: ValKind, fn_type: Option<FunctionType<'ctx>>, ast_type: Type) {
-        self.variables.insert(name, ScopeVar { ptr, ty, kind, fn_type, mutable: false, lazy_flag: None, lazy_init_expr: None, ast_type: Some(ast_type), enum_inner_type: None, enum_data_rc_managed: false });
+    fn set_with_ast_type(
+        &mut self,
+        name: String,
+        ptr: PointerValue<'ctx>,
+        ty: inkwell::types::BasicTypeEnum<'ctx>,
+        kind: ValKind,
+        fn_type: Option<FunctionType<'ctx>>,
+        ast_type: Type,
+    ) {
+        self.variables.insert(
+            name,
+            ScopeVar {
+                ptr,
+                ty,
+                kind,
+                fn_type,
+                mutable: false,
+                lazy_flag: None,
+                lazy_init_expr: None,
+                ast_type: Some(ast_type),
+                enum_inner_type: None,
+                enum_data_rc_managed: false,
+            },
+        );
     }
     fn set_enum_inner_type(&mut self, name: &str, inner_type: InnerType) {
         if let Some(var) = self.variables.get_mut(name) {
@@ -181,7 +294,11 @@ impl<'ctx> TypedValue<'ctx> {
             TypedValue::Map(_) => None,
             TypedValue::Set(_) => None,
             TypedValue::Task(_) => None,
-            TypedValue::Stream(_) | TypedValue::LazyList(_) | TypedValue::CString(_) | TypedValue::Ptr(_) | TypedValue::FileHandle(_) => None,
+            TypedValue::Stream(_)
+            | TypedValue::LazyList(_)
+            | TypedValue::CString(_)
+            | TypedValue::Ptr(_)
+            | TypedValue::FileHandle(_) => None,
             TypedValue::Struct(_, _) => None,
             TypedValue::Enum(..) => None,
             TypedValue::Unit => None,
@@ -261,59 +378,71 @@ pub(super) struct TcoState<'ctx> {
     /// Target block to jump to for tail-recursive calls
     tail_entry: inkwell::basic_block::BasicBlock<'ctx>,
     /// Parameter allocas: (alloca, type, valkind)
-    param_slots: Vec<(inkwell::values::PointerValue<'ctx>, inkwell::types::BasicTypeEnum<'ctx>, ValKind)>,
+    param_slots: Vec<(
+        inkwell::values::PointerValue<'ctx>,
+        inkwell::types::BasicTypeEnum<'ctx>,
+        ValKind,
+    )>,
     /// Original AST function name (unmangled) for self-recognition in TCO
     fn_name: String,
 }
 
 impl<'ctx> CodeGen<'ctx> {
-    pub fn new(context: &'ctx Context, name: &str, registry: TypeRegistry, target_triple: Option<String>) -> Self {
+    pub fn new(
+        context: &'ctx Context,
+        name: &str,
+        registry: TypeRegistry,
+        target_triple: Option<String>,
+    ) -> Self {
         let module = context.create_module(name);
         let builder = context.create_builder();
         // Named type to distinguish from anonymous {i64, i8*} enum types
         let string_type = context.opaque_struct_type("__atomic_str");
         string_type.set_body(
-            &[context.i64_type().into(), context.ptr_type(inkwell::AddressSpace::default()).into()],
+            &[
+                context.i64_type().into(),
+                context.ptr_type(inkwell::AddressSpace::default()).into(),
+            ],
             false,
         );
         let list_type = context.struct_type(
             &[
                 context.ptr_type(inkwell::AddressSpace::default()).into(), // data ptr
-                context.i64_type().into(), // length
-                context.i64_type().into(), // capacity
+                context.i64_type().into(),                                 // length
+                context.i64_type().into(),                                 // capacity
             ],
             false,
         );
         // Task type: {pthread: i64, done: i64, cancelled: i64, scheduler: i64, result_list: {ptr, i64, i64}}
         let task_type = context.struct_type(
             &[
-                context.i64_type().into(),    // pthread_t (opaque thread handle)
-                context.i64_type().into(),    // done flag (0=not done, 1=done)
-                context.i64_type().into(),    // cancelled flag (0=not cancelled, 1=cancelled)
-                context.i64_type().into(),    // scheduler (0=default, 1=io, 2=cpu)
-                list_type.into(),             // result list
+                context.i64_type().into(), // pthread_t (opaque thread handle)
+                context.i64_type().into(), // done flag (0=not done, 1=done)
+                context.i64_type().into(), // cancelled flag (0=not cancelled, 1=cancelled)
+                context.i64_type().into(), // scheduler (0=default, 1=io, 2=cpu)
+                list_type.into(),          // result list
             ],
             false,
         );
         // LazyList type: {head_val: i64, step_fn: i8*, state: i64, take_count: i64, map_fn: i8*, filter_fn: i8*}
         let lazylist_type = context.struct_type(
             &[
-                context.i64_type().into(),  // head value (i64 for Int lazy lists)
-                context.ptr_type(inkwell::AddressSpace::default()).into(),  // step_fn ptr
-                context.i64_type().into(),  // state
-                context.i64_type().into(),  // take_count (-1 = infinite, >=0 = count)
-                context.ptr_type(inkwell::AddressSpace::default()).into(),  // map_fn ptr (null = no mapping)
-                context.ptr_type(inkwell::AddressSpace::default()).into(),  // filter_fn ptr (null = no filter)
+                context.i64_type().into(), // head value (i64 for Int lazy lists)
+                context.ptr_type(inkwell::AddressSpace::default()).into(), // step_fn ptr
+                context.i64_type().into(), // state
+                context.i64_type().into(), // take_count (-1 = infinite, >=0 = count)
+                context.ptr_type(inkwell::AddressSpace::default()).into(), // map_fn ptr (null = no mapping)
+                context.ptr_type(inkwell::AddressSpace::default()).into(), // filter_fn ptr (null = no filter)
             ],
             false,
         );
         // Stream type: {mutex: [40 x i8], cond: [48 x i8], closed: i64, list: {ptr, i64, i64}}
         let stream_type = context.struct_type(
             &[
-                context.i8_type().array_type(40).into(),  // pthread_mutex_t = 40 bytes
-                context.i8_type().array_type(48).into(),  // pthread_cond_t = 48 bytes
-                context.i64_type().into(),                 // closed flag
-                list_type.into(),                          // data buffer list
+                context.i8_type().array_type(40).into(), // pthread_mutex_t = 40 bytes
+                context.i8_type().array_type(48).into(), // pthread_cond_t = 48 bytes
+                context.i64_type().into(),               // closed flag
+                list_type.into(),                        // data buffer list
             ],
             false,
         );
@@ -328,12 +457,21 @@ impl<'ctx> CodeGen<'ctx> {
         );
         let fat_return_type = context.opaque_struct_type("__fat_ret");
         fat_return_type.set_body(
-            &[context.i64_type().into(), context.ptr_type(inkwell::AddressSpace::default()).into()],
+            &[
+                context.i64_type().into(),
+                context.ptr_type(inkwell::AddressSpace::default()).into(),
+            ],
             false,
         );
         CodeGen {
-            context, module, builder, scope: Scope::new(),
-            string_type, list_type, lambda_count: 0, str_pat_counter: 0,
+            context,
+            module,
+            builder,
+            scope: Scope::new(),
+            string_type,
+            list_type,
+            lambda_count: 0,
+            str_pat_counter: 0,
             registry,
             named_structs: HashMap::new(),
             enum_types: HashMap::new(),
@@ -365,23 +503,47 @@ impl<'ctx> CodeGen<'ctx> {
     }
 
     /// Convert Int or Float TypedValue to FloatValue (Int gets converted via sitofp).
-    pub(super) fn typed_to_float(&self, val: &TypedValue<'ctx>) -> Result<inkwell::values::FloatValue<'ctx>, String> {
+    pub(super) fn typed_to_float(
+        &self,
+        val: &TypedValue<'ctx>,
+    ) -> Result<inkwell::values::FloatValue<'ctx>, String> {
         match val {
             TypedValue::Float(fv) => Ok(*fv),
-            TypedValue::Int(iv) => self.builder.build_signed_int_to_float(*iv, self.f64_ty(), "i2f").map_err(|e| format!("LLVM error: {}", e)),
+            TypedValue::Int(iv) => self
+                .builder
+                .build_signed_int_to_float(*iv, self.f64_ty(), "i2f")
+                .map_err(|e| format!("LLVM error: {}", e)),
             _ => Err("Expected Int or Float".to_string()),
         }
     }
 
-    pub(super) fn i64_ty(&self) -> inkwell::types::IntType<'ctx> { self.context.i64_type() }
-    pub(super) fn i32_ty(&self) -> inkwell::types::IntType<'ctx> { self.context.i32_type() }
-    pub(super) fn f64_ty(&self) -> inkwell::types::FloatType<'ctx> { self.context.f64_type() }
-    pub(super) fn bool_ty(&self) -> inkwell::types::IntType<'ctx> { self.context.bool_type() }
-    pub(super) fn void_ty(&self) -> inkwell::types::VoidType<'ctx> { self.context.void_type() }
-    pub(super) fn ptr_ty(&self) -> inkwell::types::PointerType<'ctx> { self.context.ptr_type(inkwell::AddressSpace::default()) }
+    pub(super) fn i64_ty(&self) -> inkwell::types::IntType<'ctx> {
+        self.context.i64_type()
+    }
+    pub(super) fn i32_ty(&self) -> inkwell::types::IntType<'ctx> {
+        self.context.i32_type()
+    }
+    pub(super) fn f64_ty(&self) -> inkwell::types::FloatType<'ctx> {
+        self.context.f64_type()
+    }
+    pub(super) fn bool_ty(&self) -> inkwell::types::IntType<'ctx> {
+        self.context.bool_type()
+    }
+    pub(super) fn void_ty(&self) -> inkwell::types::VoidType<'ctx> {
+        self.context.void_type()
+    }
+    pub(super) fn ptr_ty(&self) -> inkwell::types::PointerType<'ctx> {
+        self.context.ptr_type(inkwell::AddressSpace::default())
+    }
 
-    fn call_rt(&self, name: &str, args: &[BasicMetadataValueEnum<'ctx>]) -> Result<inkwell::values::CallSiteValue<'ctx>, String> {
-        let func = self.module.get_function(name)
+    fn call_rt(
+        &self,
+        name: &str,
+        args: &[BasicMetadataValueEnum<'ctx>],
+    ) -> Result<inkwell::values::CallSiteValue<'ctx>, String> {
+        let func = self
+            .module
+            .get_function(name)
             .ok_or_else(|| format!("Runtime fn '{}' not found", name))?;
         self.builder.build_call(func, args, "").map_err(llvm_err)
     }
@@ -389,10 +551,18 @@ impl<'ctx> CodeGen<'ctx> {
     /// Allocate memory with a refcount header. Returns data pointer (ptr+8).
     #[allow(dead_code)]
     pub(super) fn malloc_rc(&self, size: IntValue<'ctx>) -> Result<PointerValue<'ctx>, String> {
-        let func = self.module.get_function("atomic_malloc_rc")
+        let func = self
+            .module
+            .get_function("atomic_malloc_rc")
             .ok_or("atomic_malloc_rc not found")?;
-        let result = self.builder.build_call(func, &[size.into()], "malloc_rc").map_err(llvm_err)?;
-        Ok(result.try_as_basic_value().unwrap_basic().into_pointer_value())
+        let result = self
+            .builder
+            .build_call(func, &[size.into()], "malloc_rc")
+            .map_err(llvm_err)?;
+        Ok(result
+            .try_as_basic_value()
+            .unwrap_basic()
+            .into_pointer_value())
     }
 
     /// Increment refcount on a heap-allocated value.
@@ -413,20 +583,35 @@ impl<'ctx> CodeGen<'ctx> {
             match var.kind {
                 ValKind::Str => {
                     let str_val = self.load_string(var.ptr)?;
-                    let data_ptr = self.builder.build_extract_value(str_val, 1, "data").map_err(llvm_err)?.into_pointer_value();
+                    let data_ptr = self
+                        .builder
+                        .build_extract_value(str_val, 1, "data")
+                        .map_err(llvm_err)?
+                        .into_pointer_value();
                     self.rc_dec(data_ptr)?;
                 }
                 ValKind::List | ValKind::Map | ValKind::Set => {
                     let list_val = self.load_list(var.ptr)?;
-                    let data_ptr = self.builder.build_extract_value(list_val, 0, "data").map_err(llvm_err)?.into_pointer_value();
+                    let data_ptr = self
+                        .builder
+                        .build_extract_value(list_val, 0, "data")
+                        .map_err(llvm_err)?
+                        .into_pointer_value();
                     self.rc_dec(data_ptr)?;
                 }
                 ValKind::LazyList => {
                     // LazyList is stack-only ({i64, ptr, i64, i64}), no heap data to clean up
                 }
                 ValKind::Enum if var.enum_data_rc_managed => {
-                    let loaded = self.builder.build_load(var.ty, var.ptr, "enum_cleanup").map_err(llvm_err)?;
-                    let data_ptr = self.builder.build_extract_value(loaded.into_struct_value(), 1, "edata").map_err(llvm_err)?.into_pointer_value();
+                    let loaded = self
+                        .builder
+                        .build_load(var.ty, var.ptr, "enum_cleanup")
+                        .map_err(llvm_err)?;
+                    let data_ptr = self
+                        .builder
+                        .build_extract_value(loaded.into_struct_value(), 1, "edata")
+                        .map_err(llvm_err)?
+                        .into_pointer_value();
                     self.rc_dec(data_ptr)?;
                 }
                 _ => {}
@@ -440,20 +625,35 @@ impl<'ctx> CodeGen<'ctx> {
         match val {
             TypedValue::Str(ptr) => {
                 let str_val = self.load_string(*ptr)?;
-                let data_ptr = self.builder.build_extract_value(str_val, 1, "data").map_err(llvm_err)?.into_pointer_value();
+                let data_ptr = self
+                    .builder
+                    .build_extract_value(str_val, 1, "data")
+                    .map_err(llvm_err)?
+                    .into_pointer_value();
                 self.rc_inc(data_ptr)?;
             }
             TypedValue::List(ptr) | TypedValue::Map(ptr) | TypedValue::Set(ptr) => {
                 let list_val = self.load_list(*ptr)?;
-                let data_ptr = self.builder.build_extract_value(list_val, 0, "data").map_err(llvm_err)?.into_pointer_value();
+                let data_ptr = self
+                    .builder
+                    .build_extract_value(list_val, 0, "data")
+                    .map_err(llvm_err)?
+                    .into_pointer_value();
                 self.rc_inc(data_ptr)?;
             }
             TypedValue::LazyList(_) => {
                 // LazyList is stack-only ({i64, ptr, i64, i64}), no heap data to RC
             }
             TypedValue::Enum(alloca, _, _, true) => {
-                let loaded = self.builder.build_load(self.string_type, *alloca, "enum_rcinc").map_err(llvm_err)?;
-                let data_ptr = self.builder.build_extract_value(loaded.into_struct_value(), 1, "edata").map_err(llvm_err)?.into_pointer_value();
+                let loaded = self
+                    .builder
+                    .build_load(self.string_type, *alloca, "enum_rcinc")
+                    .map_err(llvm_err)?;
+                let data_ptr = self
+                    .builder
+                    .build_extract_value(loaded.into_struct_value(), 1, "edata")
+                    .map_err(llvm_err)?
+                    .into_pointer_value();
                 self.rc_inc(data_ptr)?;
             }
             _ => {}
@@ -462,57 +662,92 @@ impl<'ctx> CodeGen<'ctx> {
     }
 
     /// Load a string struct value from its alloca pointer
-    fn load_string(&self, ptr: PointerValue<'ctx>) -> Result<inkwell::values::StructValue<'ctx>, String> {
-        let loaded = self.builder.build_load(self.string_type, ptr, "str_load").map_err(llvm_err)?;
+    fn load_string(
+        &self,
+        ptr: PointerValue<'ctx>,
+    ) -> Result<inkwell::values::StructValue<'ctx>, String> {
+        let loaded = self
+            .builder
+            .build_load(self.string_type, ptr, "str_load")
+            .map_err(llvm_err)?;
         Ok(loaded.into_struct_value())
     }
 
     /// Call a runtime function with a string argument (loads from alloca first)
-    fn call_rt_with_str(&self, name: &str, str_ptr: PointerValue<'ctx>) -> Result<inkwell::values::CallSiteValue<'ctx>, String> {
+    fn call_rt_with_str(
+        &self,
+        name: &str,
+        str_ptr: PointerValue<'ctx>,
+    ) -> Result<inkwell::values::CallSiteValue<'ctx>, String> {
         let str_val = self.load_string(str_ptr)?;
         self.call_rt(name, &[str_val.into()])
     }
 
     /// Call a runtime function with two string arguments
-    fn call_rt_with_2str(&self, name: &str, s1: PointerValue<'ctx>, s2: PointerValue<'ctx>) -> Result<inkwell::values::CallSiteValue<'ctx>, String> {
+    fn call_rt_with_2str(
+        &self,
+        name: &str,
+        s1: PointerValue<'ctx>,
+        s2: PointerValue<'ctx>,
+    ) -> Result<inkwell::values::CallSiteValue<'ctx>, String> {
         let v1 = self.load_string(s1)?;
         let v2 = self.load_string(s2)?;
         self.call_rt(name, &[v1.into(), v2.into()])
     }
 
     /// Load a list struct value from its alloca pointer
-    fn load_list(&self, ptr: PointerValue<'ctx>) -> Result<inkwell::values::StructValue<'ctx>, String> {
-        let loaded = self.builder.build_load(self.list_type, ptr, "list_load").map_err(llvm_err)?;
+    fn load_list(
+        &self,
+        ptr: PointerValue<'ctx>,
+    ) -> Result<inkwell::values::StructValue<'ctx>, String> {
+        let loaded = self
+            .builder
+            .build_load(self.list_type, ptr, "list_load")
+            .map_err(llvm_err)?;
         Ok(loaded.into_struct_value())
     }
 
     /// Extract list data pointer from a loaded list struct
     #[allow(dead_code)]
-    fn list_data_ptr(&self, list: inkwell::values::StructValue<'ctx>) -> Result<PointerValue<'ctx>, String> {
-        Ok(self.builder.build_extract_value(list, 0, "list_data").map_err(llvm_err)?.into_pointer_value())
+    fn list_data_ptr(
+        &self,
+        list: inkwell::values::StructValue<'ctx>,
+    ) -> Result<PointerValue<'ctx>, String> {
+        Ok(self
+            .builder
+            .build_extract_value(list, 0, "list_data")
+            .map_err(llvm_err)?
+            .into_pointer_value())
     }
 
     /// Extract list length from a loaded list struct
-    fn list_len_val(&self, list: inkwell::values::StructValue<'ctx>) -> Result<IntValue<'ctx>, String> {
-        Ok(self.builder.build_extract_value(list, 1, "list_len").map_err(llvm_err)?.into_int_value())
+    fn list_len_val(
+        &self,
+        list: inkwell::values::StructValue<'ctx>,
+    ) -> Result<IntValue<'ctx>, String> {
+        Ok(self
+            .builder
+            .build_extract_value(list, 1, "list_len")
+            .map_err(llvm_err)?
+            .into_int_value())
     }
 
     /// Guess the return type from the function body expression when no annotation is provided.
     fn infer_return_type(&self, body: &Expr) -> Option<Type> {
         match body {
-            Expr::Block(stmts) => {
-                stmts.last().and_then(|s| match s {
-                    Stmt::Expr { expr: e, .. } => Some(self.infer_expr_type(e)),
-                    _ => None,
-                })
-            }
+            Expr::Block(stmts) => stmts.last().and_then(|s| match s {
+                Stmt::Expr { expr: e, .. } => Some(self.infer_expr_type(e)),
+                _ => None,
+            }),
             _ => Some(self.infer_expr_type(body)),
         }
     }
 
     fn infer_expr_type(&self, expr: &Expr) -> Type {
         match expr {
-            Expr::Literal(Literal::String(_)) | Expr::StringInterpolate(_) => Type::Named("String".into()),
+            Expr::Literal(Literal::String(_)) | Expr::StringInterpolate(_) => {
+                Type::Named("String".into())
+            }
             Expr::Literal(Literal::Int(_)) => Type::Named("Int".into()),
             Expr::Literal(Literal::Float(_)) => Type::Named("Float".into()),
             Expr::Literal(Literal::Bool(_)) => Type::Named("Bool".into()),
@@ -531,28 +766,41 @@ impl<'ctx> CodeGen<'ctx> {
                     match name.as_str() {
                         "print" | "println" => Type::Unit,
                         "toString" | "toUpper" | "toLower" => Type::Named("String".into()),
-                        "substring" | "unwrap_or" | "read_line" | "jsonEscape"
-                        | "httpRequest" | "str" | "chatOnce" | "storeMessages"
-                        | "extractContent" | "handleChat" => Type::Named("String".into()),
-                        "parse_date" | "date" => Type::Generic(Box::new(Type::Named("Option".into())), vec![Type::Named("Date".into())]),
-                        "datetime" => Type::Generic(Box::new(Type::Named("Option".into())), vec![Type::Named("DateTime".into())]),
+                        "substring" | "unwrap_or" | "read_line" | "jsonEscape" | "httpRequest"
+                        | "str" | "chatOnce" | "storeMessages" | "extractContent"
+                        | "handleChat" => Type::Named("String".into()),
+                        "parse_date" | "date" => Type::Generic(
+                            Box::new(Type::Named("Option".into())),
+                            vec![Type::Named("Date".into())],
+                        ),
+                        "datetime" => Type::Generic(
+                            Box::new(Type::Named("Option".into())),
+                            vec![Type::Named("DateTime".into())],
+                        ),
                         "format" => Type::Named("String".into()),
                         "now" => Type::Named("DateTime".into()),
                         "today" => Type::Named("Date".into()),
-                        "find" => Type::Generic(Box::new(Type::Named("Option".into())), vec![Type::Named("Int".into())]),
+                        "find" => Type::Generic(
+                            Box::new(Type::Named("Option".into())),
+                            vec![Type::Named("Int".into())],
+                        ),
                         "flip" | "constant" | "identity" => Type::Named("Int".into()),
                         "Random_new" => Type::Named("Random".into()),
-                        "next_int" => Type::Generic(Box::new(Type::Named("Tuple".into())), vec![
-                            Type::Named("Random".into()),
-                            Type::Named("Int".into()),
-                        ]),
+                        "next_int" => Type::Generic(
+                            Box::new(Type::Named("Tuple".into())),
+                            vec![Type::Named("Random".into()), Type::Named("Int".into())],
+                        ),
                         "count" => Type::Named("Int".into()),
-                        "partition" => Type::Generic(Box::new(Type::Named("Tuple".into())), vec![
-                            Type::Named("List".into()), Type::Named("List".into())
-                        ]),
+                        "partition" => Type::Generic(
+                            Box::new(Type::Named("Tuple".into())),
+                            vec![Type::Named("List".into()), Type::Named("List".into())],
+                        ),
                         _ => {
                             if self.registry.lookup_variant(name).is_some() {
-                                let enum_name = self.registry.variant_to_enum.get(name)
+                                let enum_name = self
+                                    .registry
+                                    .variant_to_enum
+                                    .get(name)
                                     .cloned()
                                     .unwrap_or_default();
                                 Type::Named(enum_name)
@@ -568,12 +816,13 @@ impl<'ctx> CodeGen<'ctx> {
             Expr::When(w) => self.infer_when_type(&w.kind),
             Expr::Continue | Expr::Break => Type::Unit,
             Expr::For(_) => Type::Unit,
-            Expr::Block(stmts) => {
-                stmts.last().map(|s| match s {
+            Expr::Block(stmts) => stmts
+                .last()
+                .map(|s| match s {
                     Stmt::Expr { expr: e, .. } => self.infer_expr_type(e),
                     _ => Type::Unit,
-                }).unwrap_or(Type::Unit)
-            }
+                })
+                .unwrap_or(Type::Unit),
             Expr::Ident(name) => {
                 // Check scope first for AST type info
                 if let Some(sv) = self.scope.get(name) {
@@ -600,14 +849,21 @@ impl<'ctx> CodeGen<'ctx> {
                         _ => Type::Named("Int".into()),
                     }
                 } else if self.registry.lookup_variant(name).is_some() {
-                    let enum_name = self.registry.variant_to_enum.get(name)
-                        .cloned().unwrap_or_default();
+                    let enum_name = self
+                        .registry
+                        .variant_to_enum
+                        .get(name)
+                        .cloned()
+                        .unwrap_or_default();
                     Type::Named(enum_name)
                 } else {
                     Type::Named("Int".into())
                 }
             }
-            Expr::MapLiteral(_) => Type::Map(Box::new(Type::Named("String".into())), Box::new(Type::Named("Int".into()))),
+            Expr::MapLiteral(_) => Type::Map(
+                Box::new(Type::Named("String".into())),
+                Box::new(Type::Named("Int".into())),
+            ),
             Expr::SetLiteral(_) => Type::Set(Box::new(Type::Named("Int".into()))),
             _ => Type::Named("Int".into()),
         }
@@ -615,7 +871,11 @@ impl<'ctx> CodeGen<'ctx> {
 
     fn infer_when_type(&self, kind: &WhenKind) -> Type {
         match kind {
-            WhenKind::OneLine { then_expr, else_expr, .. } => {
+            WhenKind::OneLine {
+                then_expr,
+                else_expr,
+                ..
+            } => {
                 let t = self.infer_expr_type(then_expr);
                 if matches!(t, Type::Unit) {
                     self.infer_expr_type(else_expr)
@@ -623,13 +883,19 @@ impl<'ctx> CodeGen<'ctx> {
                     t
                 }
             }
-            WhenKind::ValueMatch { arms, .. } | WhenKind::ConditionChain { arms } => {
-                arms.first().map(|a| self.infer_expr_type(&a.body)).unwrap_or(Type::Unit)
-            }
+            WhenKind::ValueMatch { arms, .. } | WhenKind::ConditionChain { arms } => arms
+                .first()
+                .map(|a| self.infer_expr_type(&a.body))
+                .unwrap_or(Type::Unit),
         }
     }
 
-    fn build_fn_type(&self, ret_ast: Option<&Type>, name: &str, param_tys: &[BasicMetadataTypeEnum<'ctx>]) -> FunctionType<'ctx> {
+    fn build_fn_type(
+        &self,
+        ret_ast: Option<&Type>,
+        name: &str,
+        param_tys: &[BasicMetadataTypeEnum<'ctx>],
+    ) -> FunctionType<'ctx> {
         match ret_ast {
             Some(Type::Unit) => self.void_ty().fn_type(param_tys, false),
             Some(Type::Named(n)) => match n.as_str() {
@@ -658,7 +924,8 @@ impl<'ctx> CodeGen<'ctx> {
                 }
             }
             Some(Type::Struct(fields)) => {
-                let field_tys: Vec<BasicTypeEnum> = fields.iter()
+                let field_tys: Vec<BasicTypeEnum> = fields
+                    .iter()
                     .map(|(_, ty)| self.ast_type_to_basic_type(ty))
                     .collect();
                 let st = self.context.struct_type(&field_tys, false);
@@ -726,9 +993,12 @@ impl<'ctx> CodeGen<'ctx> {
         for stmt in &program.stmts {
             self.registry.register(stmt)?;
             match stmt {
-                Stmt::TypeAlias { name, definition, .. } => {
+                Stmt::TypeAlias {
+                    name, definition, ..
+                } => {
                     if let Type::Struct(fields) = definition {
-                        let field_tys: Vec<BasicTypeEnum> = fields.iter()
+                        let field_tys: Vec<BasicTypeEnum> = fields
+                            .iter()
                             .map(|(_, ty)| self.ast_type_to_basic_type(ty))
                             .collect();
                         let struct_ty = self.context.struct_type(&field_tys, false);
@@ -762,8 +1032,16 @@ impl<'ctx> CodeGen<'ctx> {
 
         // Pass 1: Declare all user-defined functions for forward references
         for stmt in &program.stmts {
-            if let Stmt::Fun { name, params, return_type, body, .. } = stmt {
-                let param_types: Vec<Type> = params.iter()
+            if let Stmt::Fun {
+                name,
+                params,
+                return_type,
+                body,
+                ..
+            } = stmt
+            {
+                let param_types: Vec<Type> = params
+                    .iter()
                     .map(|p| p.ty.clone().unwrap_or(Type::Named("Int".into())))
                     .collect();
                 let all_typed = params.iter().all(|p| p.ty.is_some());
@@ -781,65 +1059,87 @@ impl<'ctx> CodeGen<'ctx> {
                         .push((param_types.clone(), mangled.clone()));
                 }
 
-                let param_llvm_tys: Vec<BasicMetadataTypeEnum> = params.iter()
+                let param_llvm_tys: Vec<BasicMetadataTypeEnum> = params
+                    .iter()
                     .map(|p| self.ast_type_to_llvm(p.ty.as_ref()))
                     .collect();
                 let ret_type = if name == "main" {
                     None
                 } else {
-                    return_type.as_ref().cloned()
-                        .or_else(|| {
-                            if all_typed {
-                                self.infer_return_type(body)
-                            } else {
-                                None
-                            }
-                        })
+                    return_type.as_ref().cloned().or_else(|| {
+                        if all_typed {
+                            self.infer_return_type(body)
+                        } else {
+                            None
+                        }
+                    })
                 };
                 let fn_type = self.build_fn_type(ret_type.as_ref(), &mangled, &param_llvm_tys);
                 self.module.add_function(&mangled, fn_type, None);
             }
-            if let Stmt::Module { name: mod_name, body, .. } = stmt {
+            if let Stmt::Module {
+                name: mod_name,
+                body,
+                ..
+            } = stmt
+            {
                 let prefix = format!("{}_", mod_name);
                 for inner_stmt in body {
-                    if let Stmt::Fun { name: fn_name, params, return_type, body: fn_body, .. } = inner_stmt {
+                    if let Stmt::Fun {
+                        name: fn_name,
+                        params,
+                        return_type,
+                        body: fn_body,
+                        ..
+                    } = inner_stmt
+                    {
                         let mangled = format!("{}{}", prefix, fn_name);
-                        let param_llvm_tys: Vec<BasicMetadataTypeEnum> = params.iter()
+                        let param_llvm_tys: Vec<BasicMetadataTypeEnum> = params
+                            .iter()
                             .map(|p| self.ast_type_to_llvm(p.ty.as_ref()))
                             .collect();
-                        let ret_type = return_type.as_ref().cloned()
-                            .or_else(|| {
-                                if params.iter().all(|p| p.ty.is_some()) {
-                                    self.infer_return_type(fn_body)
-                                } else {
-                                    None
-                                }
-                            });
-                        let fn_type = self.build_fn_type(ret_type.as_ref(), &mangled, &param_llvm_tys);
+                        let ret_type = return_type.as_ref().cloned().or_else(|| {
+                            if params.iter().all(|p| p.ty.is_some()) {
+                                self.infer_return_type(fn_body)
+                            } else {
+                                None
+                            }
+                        });
+                        let fn_type =
+                            self.build_fn_type(ret_type.as_ref(), &mangled, &param_llvm_tys);
                         self.module.add_function(&mangled, fn_type, None);
                     }
                 }
             }
-            if let Stmt::Extension { type_name, methods, .. } = stmt {
+            if let Stmt::Extension {
+                type_name, methods, ..
+            } = stmt
+            {
                 for m in methods {
-                    if let Stmt::Fun { name, params, return_type, body, .. } = m {
+                    if let Stmt::Fun {
+                        name,
+                        params,
+                        return_type,
+                        body,
+                        ..
+                    } = m
+                    {
                         let fn_name = format!("{}_{}", type_name, name);
-                        self.extension_methods.insert(
-                            format!("{}.{}", type_name, name),
-                            fn_name.clone(),
-                        );
-                        let param_llvm_tys: Vec<BasicMetadataTypeEnum> = params.iter()
+                        self.extension_methods
+                            .insert(format!("{}.{}", type_name, name), fn_name.clone());
+                        let param_llvm_tys: Vec<BasicMetadataTypeEnum> = params
+                            .iter()
                             .map(|p| self.ast_type_to_llvm(p.ty.as_ref()))
                             .collect();
-                        let ret_type = return_type.as_ref().cloned()
-                            .or_else(|| {
-                                if params.iter().all(|p| p.ty.is_some()) {
-                                    self.infer_return_type(body)
-                                } else {
-                                    None
-                                }
-                            });
-                        let fn_type = self.build_fn_type(ret_type.as_ref(), &fn_name, &param_llvm_tys);
+                        let ret_type = return_type.as_ref().cloned().or_else(|| {
+                            if params.iter().all(|p| p.ty.is_some()) {
+                                self.infer_return_type(body)
+                            } else {
+                                None
+                            }
+                        });
+                        let fn_type =
+                            self.build_fn_type(ret_type.as_ref(), &fn_name, &param_llvm_tys);
                         self.module.add_function(&fn_name, fn_type, None);
                     }
                 }
@@ -852,7 +1152,9 @@ impl<'ctx> CodeGen<'ctx> {
         // Check for main function
         for stmt in &program.stmts {
             if let Stmt::Fun { name, .. } = stmt {
-                if name == "main" { has_main = true; }
+                if name == "main" {
+                    has_main = true;
+                }
             }
         }
 
@@ -888,9 +1190,13 @@ impl<'ctx> CodeGen<'ctx> {
         Ok(())
     }
 
-    pub fn print_ir(&self) -> String { self.module.print_to_string().to_string() }
+    pub fn print_ir(&self) -> String {
+        self.module.print_to_string().to_string()
+    }
 
-    pub fn verify(&self) -> Result<(), String> { self.module.verify().map_err(|e| e.to_string()) }
+    pub fn verify(&self) -> Result<(), String> {
+        self.module.verify().map_err(|e| e.to_string())
+    }
 
     /// Write LLVM bitcode to a file
     pub fn emit_bitcode(&self, path: &std::path::Path) -> Result<(), String> {
@@ -901,16 +1207,20 @@ impl<'ctx> CodeGen<'ctx> {
     }
 
     /// Write assembly or object file via target machine
-    fn emit_via_target_machine(&self, path: &std::path::Path, file_type: inkwell::targets::FileType) -> Result<(), String> {
-        use inkwell::targets::{Target, TargetMachine, InitializationConfig};
+    fn emit_via_target_machine(
+        &self,
+        path: &std::path::Path,
+        file_type: inkwell::targets::FileType,
+    ) -> Result<(), String> {
+        use inkwell::targets::{InitializationConfig, Target, TargetMachine};
         let triple_str = self.target_triple.as_deref().unwrap_or("native");
         let (target, cpu, features, target_triple) = match triple_str {
             "native" | "" => {
                 Target::initialize_native(&InitializationConfig::default())
                     .map_err(|e| format!("Failed to initialize native target: {}", e))?;
                 let tt = TargetMachine::get_default_triple();
-                let t = Target::from_triple(&tt)
-                    .map_err(|e| format!("Failed to get target: {}", e))?;
+                let t =
+                    Target::from_triple(&tt).map_err(|e| format!("Failed to get target: {}", e))?;
                 let cpu = TargetMachine::get_host_cpu_name().to_string();
                 let features = TargetMachine::get_host_cpu_features().to_string();
                 (t, cpu, features, tt)
@@ -918,29 +1228,29 @@ impl<'ctx> CodeGen<'ctx> {
             "linux-x64" | "x86_64-unknown-linux-gnu" => {
                 Target::initialize_x86(&InitializationConfig::default());
                 let tt = inkwell::targets::TargetTriple::create("x86_64-unknown-linux-gnu");
-                let t = Target::from_triple(&tt)
-                    .map_err(|e| format!("Failed to get target: {}", e))?;
+                let t =
+                    Target::from_triple(&tt).map_err(|e| format!("Failed to get target: {}", e))?;
                 (t, "generic".to_string(), "".to_string(), tt)
             }
             "linux-arm64" | "aarch64-unknown-linux-gnu" => {
                 Target::initialize_aarch64(&InitializationConfig::default());
                 let tt = inkwell::targets::TargetTriple::create("aarch64-unknown-linux-gnu");
-                let t = Target::from_triple(&tt)
-                    .map_err(|e| format!("Failed to get target: {}", e))?;
+                let t =
+                    Target::from_triple(&tt).map_err(|e| format!("Failed to get target: {}", e))?;
                 (t, "generic".to_string(), "".to_string(), tt)
             }
             "windows-x64" | "x86_64-pc-windows-gnu" => {
                 Target::initialize_x86(&InitializationConfig::default());
                 let tt = inkwell::targets::TargetTriple::create("x86_64-pc-windows-gnu");
-                let t = Target::from_triple(&tt)
-                    .map_err(|e| format!("Failed to get target: {}", e))?;
+                let t =
+                    Target::from_triple(&tt).map_err(|e| format!("Failed to get target: {}", e))?;
                 (t, "generic".to_string(), "".to_string(), tt)
             }
             "wasm" | "wasm32-unknown-unknown" => {
                 Target::initialize_webassembly(&InitializationConfig::default());
                 let tt = inkwell::targets::TargetTriple::create("wasm32-unknown-unknown");
-                let t = Target::from_triple(&tt)
-                    .map_err(|e| format!("Failed to get target: {}", e))?;
+                let t =
+                    Target::from_triple(&tt).map_err(|e| format!("Failed to get target: {}", e))?;
                 (t, "generic".to_string(), "".to_string(), tt)
             }
             other => {
@@ -962,15 +1272,18 @@ impl<'ctx> CodeGen<'ctx> {
             2 => inkwell::OptimizationLevel::Default,
             _ => inkwell::OptimizationLevel::Aggressive,
         };
-        let target_machine = target.create_target_machine(
-            &target_triple,
-            &cpu,
-            &features,
-            opt,
-            inkwell::targets::RelocMode::Default,
-            inkwell::targets::CodeModel::Default,
-        ).ok_or_else(|| "Failed to create target machine".to_string())?;
-        target_machine.write_to_file(&self.module, file_type, path)
+        let target_machine = target
+            .create_target_machine(
+                &target_triple,
+                &cpu,
+                &features,
+                opt,
+                inkwell::targets::RelocMode::Default,
+                inkwell::targets::CodeModel::Default,
+            )
+            .ok_or_else(|| "Failed to create target machine".to_string())?;
+        target_machine
+            .write_to_file(&self.module, file_type, path)
             .map_err(|e| format!("Failed to write to {}: {}", path.display(), e))
     }
 
@@ -981,19 +1294,18 @@ impl<'ctx> CodeGen<'ctx> {
     pub fn emit_object(&self, path: &std::path::Path) -> Result<(), String> {
         self.emit_via_target_machine(path, inkwell::targets::FileType::Object)
     }
-
 }
 
 // ---- Submodules ----
+mod builtins;
+mod expr;
+mod for_loop;
+mod jit;
+mod map_set;
+mod misc;
+mod pattern;
 mod runtime;
 mod stmt;
-mod expr;
-mod builtins;
-mod pattern;
-mod for_loop;
-mod misc;
-mod map_set;
-mod jit;
 
 // ---- TypedValue helpers ----
 impl<'ctx> TypedValue<'ctx> {
@@ -1010,7 +1322,9 @@ impl<'ctx> TypedValue<'ctx> {
             TypedValue::Task(_) => cg.ptr_ty().into(),
             TypedValue::Stream(_) => cg.ptr_ty().into(),
             TypedValue::LazyList(_) => cg.lazylist_type.into(),
-            TypedValue::CString(_) | TypedValue::Ptr(_) | TypedValue::FileHandle(_) => cg.ptr_ty().into(),
+            TypedValue::CString(_) | TypedValue::Ptr(_) | TypedValue::FileHandle(_) => {
+                cg.ptr_ty().into()
+            }
             TypedValue::Struct(_, ty) => (*ty).into(),
             TypedValue::Enum(_, ty, ..) => (*ty).into(),
             TypedValue::Unit => cg.i64_ty().into(),
