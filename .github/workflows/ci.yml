@@ -8,8 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  LLVM_VERSION: '21.1.8'
-  LLVM_TAG: llvmorg-21.1.8
+  LLVM_VERSION: '21'
 
 jobs:
   test:
@@ -22,12 +21,6 @@ jobs:
           - name: Linux x64
             os: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
-            llvm_archive: LLVM-21.1.8-Linux-X64.tar.xz
-
-          - name: Linux ARM64
-            os: ubuntu-24.04-arm
-            target: aarch64-unknown-linux-gnu
-            llvm_archive: LLVM-21.1.8-Linux-ARM64.tar.xz
 
           - name: Windows x64
             os: windows-2022
@@ -52,19 +45,20 @@ jobs:
       - name: Setup LLVM (Linux)
         if: runner.os == 'Linux'
         run: |
-          URL="https://github.com/llvm/llvm-project/releases/download/${{ env.LLVM_TAG }}/${{ matrix.llvm_archive }}"
-          echo "Downloading $URL"
-          mkdir -p /tmp/llvm
-          curl -fSL --retry 3 --connect-timeout 30 "$URL" -o /tmp/llvm.tar.xz
-          tar xf /tmp/llvm.tar.xz -C /tmp/llvm --strip-components=1
-          rm -f /tmp/llvm.tar.xz
-          echo "LLVM_SYS_211_PREFIX=/tmp/llvm" >> "$GITHUB_ENV"
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
+          sudo add-apt-repository -y "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-$LLVM_VERSION main"
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq llvm-$LLVM_VERSION-dev
+          sudo ln -sf /usr/bin/llvm-config-$LLVM_VERSION /usr/local/bin/llvm-config
+          echo "LLVM_SYS_211_PREFIX=/usr/lib/llvm-$LLVM_VERSION" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=/usr/lib/llvm-$LLVM_VERSION/lib" >> "$GITHUB_ENV"
+          llvm-config --version
 
       - name: Setup LLVM (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $URL = "https://github.com/llvm/llvm-project/releases/download/$env:LLVM_TAG/${{ matrix.llvm_archive }}"
+          $URL = "https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.8/${{ matrix.llvm_archive }}"
           Write-Host "Downloading $URL"
           curl.exe -fSL --retry 3 --connect-timeout 30 -o C:\llvm.tar.xz "$URL"
           Write-Host "Extracting..."
