@@ -57,15 +57,13 @@ jobs:
 
       - name: Setup LLVM (Windows)
         if: runner.os == 'Windows'
-        shell: pwsh
+        shell: cmd
         run: |
-          $URL = "https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.8/${{ matrix.llvm_archive }}"
-          Write-Host "Downloading $URL"
-          curl.exe -fSL --retry 3 --connect-timeout 30 -o C:\llvm-installer.exe "$URL"
-          Write-Host "Installing LLVM silently to C:\llvm..."
-          Start-Process -Wait -FilePath "C:\llvm-installer.exe" -ArgumentList "/S /D=C:\llvm"
-          Remove-Item C:\llvm-installer.exe -Force
-          echo "LLVM_SYS_211_PREFIX=C:\llvm" >> $env:GITHUB_ENV
+          curl.exe -fSL --retry 3 --connect-timeout 30 -o C:\llvm-installer.exe "https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.8/${{ matrix.llvm_archive }}"
+          C:\llvm-installer.exe /S /D=C:\llvm
+          del /f C:\llvm-installer.exe
+          dir C:\llvm
+          echo LLVM_SYS_211_PREFIX=C:\llvm >> %GITHUB_ENV%
 
       # ── Build (debug is fine for CI) ──────────────────
       - name: Build
