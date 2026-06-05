@@ -1,0 +1,26 @@
+// Stability test: HTTP with custom headers and body
+fun main() {
+    // Multiple headers with body - test header parsing in curl
+    val headers = "X-Custom-1: value1\nX-Custom-2: value2\nContent-Type: text/plain"
+    val body = "atomic-compiler-test-body"
+    val resp = httpRequest("POST", "http://www.google.com", headers, body)
+
+    // Verify response came back (even if status isn't 200, we get a response)
+    print("resp_len:")
+    print(len(resp))
+
+    // Verify the result contains status code + newline + body format
+    val hasNl = when findChar(resp, "\n") >= 0 { 1 else 0 }
+    print("has_newline:")
+    print(hasNl)
+
+    println("http_post_ok")
+}
+
+fun findChar(s: String, pat: String): Int {
+    var i = 0
+    for i < len(s) {
+        when substring(s, i, len(pat)) == pat { return i else i = i + 1 }
+    }
+    -1
+}

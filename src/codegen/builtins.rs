@@ -4419,6 +4419,7 @@ impl<'ctx> CodeGen<'ctx> {
         args: &[Expr],
         trailing: &Option<Box<Expr>>,
     ) -> Result<TypedValue<'ctx>, String> {
+        self.emit_threading_runtime();
         // Parse optional scheduler argument
         let scheduler = if !args.is_empty() {
             match &args[0] {
@@ -4660,6 +4661,7 @@ impl<'ctx> CodeGen<'ctx> {
         _args: &[Expr],
         trailing: &Option<Box<Expr>>,
     ) -> Result<TypedValue<'ctx>, String> {
+        self.emit_threading_runtime();
         let body = trailing
             .as_ref()
             .ok_or("coroutineScope requires a trailing lambda body")?;
@@ -5007,30 +5009,46 @@ impl<'ctx> CodeGen<'ctx> {
         if args.len() != 1 {
             return Err("delay expects 1 argument (ms)".to_string());
         }
+        self.emit_sleep_runtime();
         let ms_val = self.compile_expr(&args[0])?;
         let ms = match ms_val {
             TypedValue::Int(v) => v,
             _ => return Err("delay: argument must be an Int (milliseconds)".to_string()),
         };
-        // usleep takes microseconds: ms * 1000
-        let thousand = self.i64_ty().const_int(1000, false);
-        let us = self
+        let ms_i32 = self
             .builder
-            .build_int_mul(ms, thousand, "delay_us")
+            .build_int_truncate(ms, self.i32_ty(), "delay_ms32")
             .map_err(llvm_err)?;
-        // Truncate to i32 for usleep
-        let us_i32 = self
-            .builder
-            .build_int_truncate(us, self.i32_ty(), "delay_us32")
-            .map_err(llvm_err)?;
-        let usleep_fn = self
-            .module
-            .get_function("usleep")
-            .ok_or("usleep not found")?;
-        let _ = self
-            .builder
-            .build_call(usleep_fn, &[us_i32.into()], "")
-            .map_err(llvm_err)?;
+        if self.is_target_windows() {
+            // Windows Sleep takes milliseconds, returns void
+            let sleep_fn = self
+                .module
+                .get_function("Sleep")
+                .ok_or("Sleep not found")?;
+            let _ = self
+                .builder
+                .build_call(sleep_fn, &[ms_i32.into()], "")
+                .map_err(llvm_err)?;
+        } else {
+            // POSIX usleep takes microseconds: ms * 1000
+            let thousand = self.i64_ty().const_int(1000, false);
+            let us = self
+                .builder
+                .build_int_mul(ms, thousand, "delay_us")
+                .map_err(llvm_err)?;
+            let us_i32 = self
+                .builder
+                .build_int_truncate(us, self.i32_ty(), "delay_us32")
+                .map_err(llvm_err)?;
+            let usleep_fn = self
+                .module
+                .get_function("usleep")
+                .ok_or("usleep not found")?;
+            let _ = self
+                .builder
+                .build_call(usleep_fn, &[us_i32.into()], "")
+                .map_err(llvm_err)?;
+        }
         Ok(TypedValue::Unit)
     }
 
@@ -5058,6 +5076,8 @@ impl<'ctx> CodeGen<'ctx> {
         args: &[Expr],
         trailing: &Option<Box<Expr>>,
     ) -> Result<TypedValue<'ctx>, String> {
+        self.emit_threading_runtime();
+        self.emit_sleep_runtime();
         if args.len() != 1 {
             return Err(
                 "withTimeout expects 2 arguments: timeout(ms) and a trailing lambda".to_string(),
@@ -5314,18 +5334,33 @@ impl<'ctx> CodeGen<'ctx> {
 
         // Poll body: sleep 10ms, then check done flag
         self.builder.position_at_end(poll_body);
-        let usleep_fn = self
-            .module
-            .get_function("usleep")
-            .ok_or("usleep not found")?;
-        let _ = self
-            .builder
-            .build_call(
-                usleep_fn,
-                &[self.i32_ty().const_int(poll_interval as u64, false).into()],
-                "",
-            )
-            .map_err(llvm_err)?;
+        if self.is_target_windows() {
+            let sleep_fn = self
+                .module
+                .get_function("Sleep")
+                .ok_or("Sleep not found")?;
+            let _ = self
+                .builder
+                .build_call(
+                    sleep_fn,
+                    &[self.i32_ty().const_int(10, false).into()],
+                    "",
+                )
+                .map_err(llvm_err)?;
+        } else {
+            let usleep_fn = self
+                .module
+                .get_function("usleep")
+                .ok_or("usleep not found")?;
+            let _ = self
+                .builder
+                .build_call(
+                    usleep_fn,
+                    &[self.i32_ty().const_int(poll_interval as u64, false).into()],
+                    "",
+                )
+                .map_err(llvm_err)?;
+        }
         // Update elapsed
         let new_elapsed = self
             .builder
@@ -5597,6 +5632,7 @@ impl<'ctx> CodeGen<'ctx> {
     /// stream() — create a new Stream<T> channel with mutex + condvar + buffer.
     /// Stream struct (heap-allocated): {mutex: [40 x i8], cond: [48 x i8], closed: i64, list: {ptr, i64, i64}}
     pub(super) fn builtin_stream_create(&mut self) -> Result<TypedValue<'ctx>, String> {
+        self.emit_threading_runtime();
         let stream_ty = self.stream_type;
         let null_ptr = self.context.ptr_type(Default::default()).const_null();
         let size_ptr = unsafe {
@@ -5702,6 +5738,7 @@ impl<'ctx> CodeGen<'ctx> {
         name: &str,
         args: &[Expr],
     ) -> Result<TypedValue<'ctx>, String> {
+        self.emit_threading_runtime();
         match name {
             "send" => {
                 if args.len() != 2 {
@@ -6017,6 +6054,9 @@ impl<'ctx> CodeGen<'ctx> {
     ) -> Result<TypedValue<'ctx>, String> {
         if args.len() != 1 {
             return Err(format!("{} expects 1 argument: task", name));
+        }
+        if name == "wait" {
+            self.emit_threading_runtime();
         }
         let task_val = self.compile_expr(&args[0])?;
         let task_ptr = match task_val {

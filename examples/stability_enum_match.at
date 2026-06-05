@@ -1,0 +1,55 @@
+// Stability test: complex enum pattern matching
+enum Result { Ok(Int), Err(Int) }
+
+enum Tree {
+    Leaf(Int),
+    Node(Int)
+}
+
+fun node_or_leaf(t: Tree): Int {
+    when t {
+        Leaf(v) -> v
+        Node(v) -> v * 10
+    }
+}
+
+fun process_result(r: Result): Int {
+    when r {
+        Ok(v) -> v
+        Err(code) -> -code
+    }
+}
+
+fun main() {
+    val r1 = Ok(42)
+    val r2 = Err(7)
+    print(process_result(r1))
+    print(process_result(r2))
+
+    val t1 = Leaf(5)
+    val t2 = Node(3)
+    print(node_or_leaf(t1))
+    print(node_or_leaf(t2))
+
+    // Complex match with guards
+    val x = 15
+    val result = when {
+        x < 0 -> -1
+        x < 10 -> 10
+        x < 20 -> 20
+        _ -> 99
+    }
+    print(result)
+
+    // Exhaustive enum matching across all variants
+    val items = List[Ok(1), Err(2), Ok(3), Err(4)]
+    val mapped = fold(0, items) { acc, item ->
+        acc + when item {
+            Ok(v) -> v
+            Err(c) -> -c
+        }
+    }
+    print(mapped)
+
+    println("enum_match_ok")
+}

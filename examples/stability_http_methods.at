@@ -1,0 +1,21 @@
+// Stability test: HTTP method dispatch and validation
+fun main() {
+    // All standard methods should be accepted and execute
+    val getR = httpRequest("GET", "http://www.google.com", "", "")
+    val postR = httpRequest("POST", "http://www.google.com", "", "")
+    val putR = httpRequest("PUT", "http://www.google.com", "", "")
+    val deleteR = httpRequest("DELETE", "http://www.google.com", "", "")
+    val patchR = httpRequest("PATCH", "http://www.google.com", "", "")
+
+    // All should return response strings
+    val allOk = when len(getR) > 0 and len(postR) > 0 and len(putR) > 0 and len(deleteR) > 0 and len(patchR) > 0 { 1 else 0 }
+
+    print("all_5_responses:")
+    print(allOk)
+    print("get_len:")
+    print(len(getR))
+    print("post_len:")
+    print(len(postR))
+
+    println("http_methods_ok")
+}

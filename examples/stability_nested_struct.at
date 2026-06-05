@@ -1,0 +1,33 @@
+// Stability test: Nested struct operations
+type Address = {city: Int, zip: Int}
+
+type Person = {name: Int, age: Int, addr: Address}
+
+fun make_person(name_val: Int, age_val: Int, city_val: Int, zip_val: Int): Person {
+    {name = name_val, age = age_val, addr = {city = city_val, zip = zip_val}}
+}
+
+fun get_city(p: Person): Int {
+    p.addr.city
+}
+
+fun inc_age(p: Person): Person {
+    {name = p.name, age = p.age + 1, addr = p.addr}
+}
+
+fun main() {
+    val p = make_person(1, 30, 2, 10001)
+    print(p.name)
+    print(p.age)
+    print(p.addr.city)
+    print(p.addr.zip)
+
+    val p2 = inc_age(p)
+    print(p2.age)
+
+    // Nested field read chains
+    val city = get_city(p)
+    print(city)
+
+    println("nested_struct_ok")
+}

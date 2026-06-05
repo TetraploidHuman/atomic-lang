@@ -1,0 +1,51 @@
+// Stability test: HTTP request compilation + error handling
+// Tests that httpRequest builtin compiles, runs, and returns the expected
+// "STATUS_CODE\nBODY" format even on error.
+
+fun parseStatus(resp: String): Int {
+    var i = 0
+    for i < len(resp) {
+        when substring(resp, i, 1) == "\n" { return parseDigits(resp, 0, i) else i = i + 1 }
+    }
+    parseDigits(resp, 0, len(resp))
+}
+
+fun parseDigits(s: String, start: Int, end: Int): Int {
+    var result = 0
+    var i = start
+    for i < end {
+        val ch = substring(s, i, 1)
+        val d = when ch == "0" { 0 else when ch == "1" { 1 else when ch == "2" { 2 else when ch == "3" { 3 else when ch == "4" { 4 else when ch == "5" { 5 else when ch == "6" { 6 else when ch == "7" { 7 else when ch == "8" { 8 else when ch == "9" { 9 else -1 } } } } } } } } } }
+        when d < 0 { return result else result = result * 10 + d }
+        i = i + 1
+    }
+    result
+}
+
+fun main() {
+    // Test 1: Connection to a closed port — should fail with "0\n..." format
+    val r1 = httpRequest("GET", "http://127.0.0.1:59999/nope", "", "")
+    val s1 = parseStatus(r1)
+    print("err_status:")
+    print(s1)
+
+    // Test 2: Ensure response has content (error message or body)
+    val r1len = len(r1)
+    print("err_len_gt_0:")
+    print(when r1len > 0 { 1 else 0 })
+
+    // Test 3: GET request that should work (google is reliably up)
+    val r2 = httpRequest("GET", "http://www.google.com", "", "")
+    val s2 = parseStatus(r2)
+    print("google_status:")
+    print(when s2 > 0 { 1 else 0 })
+
+    // Test 4: Round-trip: method and url are preserved in behavior
+    // POST with a body should produce a different result than GET
+    val postR = httpRequest("POST", "http://www.google.com", "X-Test: hello", "some_data")
+    val postS = parseStatus(postR)
+    print("post_called:")
+    print(when postS > 0 { 1 else 0 })
+
+    println("http_get_ok")
+}

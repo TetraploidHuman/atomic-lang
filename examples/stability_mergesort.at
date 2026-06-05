@@ -1,0 +1,38 @@
+// Stability test: merge sort with recursion + list operations
+fun merge(left, right) {
+    when len(left) == 0 { right
+    else when len(right) == 0 { left
+    else {
+        when left[0] <= right[0] {
+            val result = merge(slice(left, 1, len(left)), right)
+            concat(List[left[0]], result)
+        } else {
+            val result = merge(left, slice(right, 1, len(right)))
+            concat(List[right[0]], result)
+        }
+    } } }
+}
+
+fun mergesort(arr) {
+    val n = len(arr)
+    when n <= 1 { arr
+    else {
+        val mid = n / 2
+        val left = mergesort(slice(arr, 0, mid))
+        val right = mergesort(slice(arr, mid, n))
+        merge(left, right)
+    } }
+}
+
+fun main() {
+    val input = List[38, 27, 43, 3, 9, 82, 10]
+    val sorted = mergesort(input)
+    print(sorted[0])
+    print(sorted[1])
+    print(sorted[2])
+    print(sorted[3])
+    print(sorted[4])
+    print(sorted[5])
+    print(sorted[6])
+    println("merge_sort_ok")
+}

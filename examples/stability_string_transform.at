@@ -1,0 +1,30 @@
+// Stability test: complex string transformations
+fun main() {
+    // Multi-step transformation
+    val text = "  Hello, World!  "
+    val t1 = trim(text)
+    val t2 = replace(t1, "World", "Atomic")
+
+    // Split and join pipeline
+    val parts = split(t2, " ")
+    val reversed = join(reverse(parts), " ")
+
+    // Substring + concat
+    val sub = substring(t2, 0, 5)
+
+    // Case conversions
+    val upper = to_upper(t2)
+    val lower = to_lower(upper)
+
+    print(t2)
+    print(reversed)
+    print(sub)
+    print(upper)
+    print(lower)
+
+    // Chained operations
+    val chained = to_upper(trim(replace("foo-bar-baz", "-", " ")))
+    print(chained)
+
+    println("string_transform_ok")
+}

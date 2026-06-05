@@ -1,0 +1,60 @@
+// Stability test: DeepSeek API call — send "你好" and verify response
+fun main() {
+    val content = chatOnce("你好")
+    val hasResponse = len(content) > 0
+    print("response_len:")
+    print(len(content))
+    print("has_response:")
+    print(when hasResponse { 1 else 0 })
+    println("deepseek_ok")
+}
+
+fun chatOnce(input: String): String {
+    val userMsg = "{\"role\": \"user\", \"content\": \"" + jsonEscape(input) + "\"}"
+    val body = "{\"model\": \"deepseek-chat\", \"messages\": [" + userMsg + "]}"
+    val headers = "Authorization: Bearer sk-83dcfb84f4e945df9dadf73257781119\nContent-Type: application/json"
+    val resp = httpRequest("POST", "https://api.deepseek.com/chat/completions", headers, body)
+    extractContent(resp)
+}
+
+fun extractContent(raw: String): String {
+    val nl = findChar(raw, "\n")
+    val json = when nl >= 0 { substring(raw, nl + 1, len(raw) - nl - 1) else raw }
+    val start = findSubstr(json, "\"content\":\"")
+    val from = start + 11
+    val end = findQuote(json, from)
+    when start >= 0 { substring(json, from, end - from) else raw }
+}
+
+fun findChar(s: String, pat: String): Int {
+    var i = 0
+    for i <= len(s) - len(pat) {
+        when substring(s, i, len(pat)) == pat { return i else i = i + 1 }
+    }
+    -1
+}
+
+fun findSubstr(s: String, pat: String): Int {
+    findChar(s, pat)
+}
+
+fun findQuote(s: String, from: Int): Int {
+    var i = from
+    for i < len(s) {
+        val ch = substring(s, i, 1)
+        when ch == "\"" { return i else i = i + 1 }
+    }
+    -1
+}
+
+fun jsonEscape(s: String): String {
+    var r = ""
+    var i = 0
+    for i < len(s) {
+        val ch = substring(s, i, 1)
+        val esc = when ch == "\"" { "\\\"" else when ch == "\\" { "\\\\" else when ch == "\n" { "\\n" else when ch == "\r" { "\\r" else when ch == "\t" { "\\t" else ch } } } } }
+        r = r + esc
+        i = i + 1
+    }
+    r
+}

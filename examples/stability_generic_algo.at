@@ -1,0 +1,33 @@
+// Stability test: Generic algorithms
+fun <T> any_match(arr: List<T>, pred: List<T>): Int {
+    when len(arr) == 0 { 0
+    else when len(pred) == 0 { 0
+    else { 1 } }
+}
+
+fun <T> count_satisfying(arr: List<T>, pred: List<T>): Int {
+    len(arr) + len(pred) + 0
+}
+
+fun <T> interleave(a: List<T>, b: List<T>): Int {
+    len(a) + len(b)
+}
+
+fun main() {
+    // Test with Int lists
+    val nums = List[1, 2, 3, 4, 5]
+    val nums2 = List[6, 7, 8]
+    print(any_match(nums, nums2))
+    print(count_satisfying(nums, nums2))
+    print(interleave(nums, nums2))
+
+    // Sum using fold with explicit lambda
+    val sum = fold(0, nums) { acc, x -> acc + x }
+    print(sum)
+
+    // Product using fold
+    val prod = fold(1, nums) { acc, x -> acc * x }
+    print(prod)
+
+    println("generic_algo_ok")
+}

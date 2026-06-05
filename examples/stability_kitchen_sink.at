@@ -1,0 +1,74 @@
+// Stability test: Kitchen sink — multiple features combined
+fun <T> id(x: T): T { x }
+
+fun fib(n: Int): Int {
+    when n <= 1 { n else fib(n - 1) + fib(n - 2) }
+}
+
+fun apply_twice(f: Int, x: Int): Int {
+    0
+}
+
+fun main() {
+    // 1. Recursive fibonacci (small values)
+    print(fib(0))
+    print(fib(1))
+    print(fib(5))
+    print(fib(10))
+
+    // 2. List operations with generics
+    val lst = List[10, 20, 30, 40, 50]
+    val doubled = map(lst, { it * 2 })
+    val filtered = filter(lst, { it > 20 })
+    print(doubled[0])
+    print(doubled[4])
+    print(len(filtered))
+    print(fold(0, filtered, { a, x -> a + x }))
+
+    // 3. String operations
+    val s = trim("  ok  ")
+    print(s)
+
+    // 4. Struct
+    val pt = {x = 10, y = 20}
+    print(pt.x)
+    print(pt.y)
+
+    // 5. Enum
+    val r = Ok(99)
+    val v = when r { Ok(v) -> v else 0 }
+    print(v)
+
+    // 6. Compound assignments
+    var counter = 0
+    counter += 10
+    counter *= 3
+    print(counter)
+
+    // 7. Range + for
+    val sum = fold(0, for x in 1..5 { x * x }, { a, x -> a + x })
+    print(sum)
+
+    // 8. Closure with captures
+    val scale = 10
+    val scaleBy = { x -> x * scale }
+    print(scaleBy(7))
+
+    // 9. Chained operations
+    val result = to_upper(trim(replace("hello world", "world", "atomic")))
+    print(result)
+
+    // 10. Generic identity
+    print(id(42))
+    print(id(3.14))
+
+    // 11. Logical short-circuit
+    val short = 1 == 1 and 2 == 2
+    print(when short { 1 else 0 })
+
+    // 12. Type conversions
+    val fi = to_float(7)
+    print(fi)
+
+    println("kitchen_sink_ok")
+}

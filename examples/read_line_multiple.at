@@ -1,0 +1,7 @@
+// read_line multiple lines: read two lines and print each
+fun main() {
+    val first = unwrap_or(read_line(), "EOF")
+    println(first)
+    val second = unwrap_or(read_line(), "EOF")
+    println(second)
+}

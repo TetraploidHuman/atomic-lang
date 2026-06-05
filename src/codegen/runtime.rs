@@ -164,109 +164,10 @@ impl<'ctx> CodeGen<'ctx> {
             .module
             .add_function("cbrt", f64.fn_type(&[f64.into()], false), None);
 
-        // ---- pthread / concurrency external declarations ----
-        // pthread_t            = unsigned long (8 bytes on 64-bit)
-        // pthread_mutex_t      = 40 bytes on Linux x86_64
-        // pthread_cond_t       = 48 bytes on Linux x86_64
-        // pthread_attr_t       = opaque (use NULL for defaults)
-        // pthread_mutexattr_t  = opaque (use NULL for defaults)
-        // pthread_condattr_t   = opaque (use NULL for defaults)
-
-        // pthread_create(pthread_t*, attr*, void*(*)(void*), void*) -> i32
-        let pthread_create_fn = self.module.add_function(
-            "pthread_create",
-            i32.fn_type(&[ptr.into(), ptr.into(), ptr.into(), ptr.into()], false),
-            None,
-        );
-        // pthread_join(pthread_t, void**) -> i32
-        let pthread_join_fn = self.module.add_function(
-            "pthread_join",
-            i32.fn_type(&[i64.into(), ptr.into()], false),
-            None,
-        );
-        // pthread_detach(pthread_t) -> i32
-        let pthread_detach_fn =
-            self.module
-                .add_function("pthread_detach", i32.fn_type(&[i64.into()], false), None);
-
-        // pthread_mutex_init(mutex_t*, attr*) -> i32
-        let pthread_mutex_init_fn = self.module.add_function(
-            "pthread_mutex_init",
-            i32.fn_type(&[ptr.into(), ptr.into()], false),
-            None,
-        );
-        // pthread_mutex_lock(mutex_t*) -> i32
-        let pthread_mutex_lock_fn = self.module.add_function(
-            "pthread_mutex_lock",
-            i32.fn_type(&[ptr.into()], false),
-            None,
-        );
-        // pthread_mutex_unlock(mutex_t*) -> i32
-        let pthread_mutex_unlock_fn = self.module.add_function(
-            "pthread_mutex_unlock",
-            i32.fn_type(&[ptr.into()], false),
-            None,
-        );
-        // pthread_mutex_destroy(mutex_t*) -> i32
-        let pthread_mutex_destroy_fn = self.module.add_function(
-            "pthread_mutex_destroy",
-            i32.fn_type(&[ptr.into()], false),
-            None,
-        );
-
-        // pthread_cond_init(cond_t*, attr*) -> i32
-        let pthread_cond_init_fn = self.module.add_function(
-            "pthread_cond_init",
-            i32.fn_type(&[ptr.into(), ptr.into()], false),
-            None,
-        );
-        // pthread_cond_wait(cond_t*, mutex_t*) -> i32
-        let pthread_cond_wait_fn = self.module.add_function(
-            "pthread_cond_wait",
-            i32.fn_type(&[ptr.into(), ptr.into()], false),
-            None,
-        );
-        // pthread_cond_timedwait(cond_t*, mutex_t*, timespec*) -> i32
-        let pthread_cond_timedwait_fn = self.module.add_function(
-            "pthread_cond_timedwait",
-            i32.fn_type(&[ptr.into(), ptr.into(), ptr.into()], false),
-            None,
-        );
-        // pthread_cond_signal(cond_t*) -> i32
-        let pthread_cond_signal_fn = self.module.add_function(
-            "pthread_cond_signal",
-            i32.fn_type(&[ptr.into()], false),
-            None,
-        );
-        // pthread_cond_broadcast(cond_t*) -> i32
-        let pthread_cond_broadcast_fn = self.module.add_function(
-            "pthread_cond_broadcast",
-            i32.fn_type(&[ptr.into()], false),
-            None,
-        );
-        // pthread_cond_destroy(cond_t*) -> i32
-        let pthread_cond_destroy_fn = self.module.add_function(
-            "pthread_cond_destroy",
-            i32.fn_type(&[ptr.into()], false),
-            None,
-        );
-
-        // usleep(useconds_t) -> i32 (for delay)
-        let usleep_fn = self
-            .module
-            .add_function("usleep", i32.fn_type(&[i32.into()], false), None);
-
-        // pthread_cancel(pthread_t) -> i32 (for withTimeout cancellation)
-        let pthread_cancel_fn =
-            self.module
-                .add_function("pthread_cancel", i32.fn_type(&[i64.into()], false), None);
-
-        // clock_gettime(clockid_t, timespec*) -> i32 (for timed operations)
-        let clock_gettime_fn = self.module.add_function(
-            "clock_gettime",
-            i32.fn_type(&[i32.into(), ptr.into()], false),
-            None,
-        );
+        // Threading, sleep, and clock functions are emitted lazily.
+        // See emit_threading_runtime(), emit_sleep_runtime() below.
+        // This avoids unresolved-symbol errors on platforms that don't
+        // provide them (e.g. Windows without winpthreads).
 
         // memmove(dest, src, n) -> void* — for shifting list elements
         let _memmove_fn = self.module.add_function(
@@ -4623,6 +4524,14 @@ impl<'ctx> CodeGen<'ctx> {
         let frl_adj_len = self
             .builder
             .build_select(frl_is_nl, frl_last, frl_str_len, "adj_len")
+            .map_err(llvm_err)?;
+        let frl_stripped = self
+            .builder
+            .build_select(frl_is_nl, i8.const_int(0, false), frl_last_ch, "stripped")
+            .map_err(llvm_err)?;
+        let _ = self
+            .builder
+            .build_store(frl_last_ptr, frl_stripped)
             .map_err(llvm_err)?;
         let frl_o_undef = frl_ret_ty.get_undef();
         let frl_o1 = self
@@ -11471,6 +11380,16 @@ impl<'ctx> CodeGen<'ctx> {
             .builder
             .build_select(is_nl, last_idx, str_len, "adj_len")
             .map_err(llvm_err)?;
+        // Replace trailing \n with \0 so that null-terminated string
+        // functions (printf, etc.) do not include the stripped newline.
+        let stripped_ch = self
+            .builder
+            .build_select(is_nl, i8.const_int(0, false), last_ch, "stripped")
+            .map_err(llvm_err)?;
+        let _ = self
+            .builder
+            .build_store(last_ptr, stripped_ch)
+            .map_err(llvm_err)?;
         let ok_undef = rl_ret_ty.get_undef();
         let ok_r1 = self
             .builder
@@ -11505,6 +11424,31 @@ impl<'ctx> CodeGen<'ctx> {
         }
         let saved_pos = self.builder.get_insert_block();
 
+        if self.is_target_windows() {
+            // TODO: full Windows read_dir using FindFirstFileA / FindNextFileA / FindClose.
+            // For now return an empty list so compilation succeeds.
+            let rd_fn = self.module.add_function(
+                "atomic_read_dir",
+                self.list_type.fn_type(&[self.string_type.into()], false),
+                None,
+            );
+            let rd_entry = self.context.append_basic_block(rd_fn, "entry");
+            self.builder.position_at_end(rd_entry);
+            let rd_empty = self.module.get_function("atomic_list_create").unwrap();
+            let result = self
+                .builder
+                .build_call(rd_empty, &[self.i64_ty().const_int(0, false).into()], "")
+                .map_err(llvm_err)?
+                .try_as_basic_value()
+                .unwrap_basic();
+            let _ = self.builder.build_return(Some(&result));
+            if let Some(block) = saved_pos {
+                self.builder.position_at_end(block);
+            }
+            return Ok(());
+        }
+
+        // POSIX implementation (Linux / macOS / *BSD)
         let i64 = self.i64_ty();
         let ptr = self.ptr_ty();
         let i8 = self.context.i8_type();
@@ -11669,5 +11613,168 @@ impl<'ctx> CodeGen<'ctx> {
             self.builder.position_at_end(block);
         }
         Ok(())
+    }
+
+    /// Emit threading runtime declarations (pthreads on Linux, Win32 on Windows).
+    /// Called lazily when the program uses launch/coroutineScope/stream/withTimeout/wait.
+    pub(super) fn emit_threading_runtime(&self) {
+        if self.module.get_function("pthread_create").is_some()
+            || self.module.get_function("CreateThread").is_some()
+        {
+            return;
+        }
+        let i32 = self.context.i32_type();
+        let i64 = self.i64_ty();
+        let ptr = self.ptr_ty();
+        let void = self.context.void_type();
+
+        if self.is_target_windows() {
+            // Windows thread API (kernel32.dll)
+            self.module.add_function(
+                "CreateThread",
+                ptr.fn_type(&[ptr.into(), i64.into(), ptr.into(), ptr.into(), i32.into(), ptr.into()], false),
+                None,
+            );
+            self.module.add_function(
+                "WaitForSingleObject",
+                i32.fn_type(&[ptr.into(), i32.into()], false),
+                None,
+            );
+            self.module.add_function(
+                "TerminateThread",
+                i32.fn_type(&[ptr.into(), i32.into()], false),
+                None,
+            );
+            // CRITICAL_SECTION = 40 bytes opaque; pass by pointer
+            self.module.add_function(
+                "InitializeCriticalSection",
+                void.fn_type(&[ptr.into()], false),
+                None,
+            );
+            self.module.add_function(
+                "EnterCriticalSection",
+                void.fn_type(&[ptr.into()], false),
+                None,
+            );
+            self.module.add_function(
+                "LeaveCriticalSection",
+                void.fn_type(&[ptr.into()], false),
+                None,
+            );
+            self.module.add_function(
+                "DeleteCriticalSection",
+                void.fn_type(&[ptr.into()], false),
+                None,
+            );
+            // CONDITION_VARIABLE = 8 bytes opaque; pass by pointer
+            self.module.add_function(
+                "InitializeConditionVariable",
+                void.fn_type(&[ptr.into()], false),
+                None,
+            );
+            self.module.add_function(
+                "SleepConditionVariableCS",
+                i32.fn_type(&[ptr.into(), ptr.into(), i32.into()], false),
+                None,
+            );
+            self.module.add_function(
+                "WakeConditionVariable",
+                void.fn_type(&[ptr.into()], false),
+                None,
+            );
+            self.module.add_function(
+                "WakeAllConditionVariable",
+                void.fn_type(&[ptr.into()], false),
+                None,
+            );
+        } else {
+            // POSIX pthreads (Linux / macOS / *BSD)
+            self.module.add_function(
+                "pthread_create",
+                i32.fn_type(&[ptr.into(), ptr.into(), ptr.into(), ptr.into()], false),
+                None,
+            );
+            self.module.add_function(
+                "pthread_join",
+                i32.fn_type(&[i64.into(), ptr.into()], false),
+                None,
+            );
+            self.module.add_function(
+                "pthread_cancel",
+                i32.fn_type(&[i64.into()], false),
+                None,
+            );
+            self.module.add_function(
+                "pthread_detach",
+                i32.fn_type(&[i64.into()], false),
+                None,
+            );
+            self.module.add_function(
+                "pthread_mutex_init",
+                i32.fn_type(&[ptr.into(), ptr.into()], false),
+                None,
+            );
+            self.module.add_function(
+                "pthread_mutex_lock",
+                i32.fn_type(&[ptr.into()], false),
+                None,
+            );
+            self.module.add_function(
+                "pthread_mutex_unlock",
+                i32.fn_type(&[ptr.into()], false),
+                None,
+            );
+            self.module.add_function(
+                "pthread_mutex_destroy",
+                i32.fn_type(&[ptr.into()], false),
+                None,
+            );
+            self.module.add_function(
+                "pthread_cond_init",
+                i32.fn_type(&[ptr.into(), ptr.into()], false),
+                None,
+            );
+            self.module.add_function(
+                "pthread_cond_wait",
+                i32.fn_type(&[ptr.into(), ptr.into()], false),
+                None,
+            );
+            self.module.add_function(
+                "pthread_cond_timedwait",
+                i32.fn_type(&[ptr.into(), ptr.into(), ptr.into()], false),
+                None,
+            );
+            self.module.add_function(
+                "pthread_cond_signal",
+                i32.fn_type(&[ptr.into()], false),
+                None,
+            );
+            self.module.add_function(
+                "pthread_cond_broadcast",
+                i32.fn_type(&[ptr.into()], false),
+                None,
+            );
+            self.module.add_function(
+                "pthread_cond_destroy",
+                i32.fn_type(&[ptr.into()], false),
+                None,
+            );
+        }
+    }
+
+    /// Emit sleep runtime declaration (usleep on POSIX, Sleep on Windows).
+    /// Called lazily when the program uses delay() or withTimeout().
+    pub(super) fn emit_sleep_runtime(&self) {
+        let usleep_exists = self.module.get_function("usleep").is_some();
+        let sleep_exists = self.module.get_function("Sleep").is_some();
+        if usleep_exists || sleep_exists {
+            return;
+        }
+        let i32 = self.context.i32_type();
+        if self.is_target_windows() {
+            self.module.add_function("Sleep", self.context.void_type().fn_type(&[i32.into()], false), None);
+        } else {
+            self.module.add_function("usleep", i32.fn_type(&[i32.into()], false), None);
+        }
     }
 }

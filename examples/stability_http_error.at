@@ -1,0 +1,21 @@
+// Stability test: HTTP error handling
+fun main() {
+    // Test 1: Connection refused (closed port) — guaranteed to fail
+    val r1 = httpRequest("GET", "http://127.0.0.1:59999/nope", "", "")
+    // Response should start with "0\n" on error
+    val startsWithZero = when len(r1) >= 2 { when substring(r1, 0, 2) == "0\n" { 1 else 0 } else 0 }
+    print("conn_refused_0:")
+    print(startsWithZero)
+
+    // Test 2: Invalid/missing host
+    val r2 = httpRequest("GET", "http://this-host-does-not-exist-99332211.example", "", "")
+    print("dns_fail:")
+    print(when len(r2) > 0 { 1 else 0 })
+
+    // Test 3: Empty URL handling
+    val r3 = httpRequest("GET", "", "", "")
+    print("empty_url:")
+    print(when len(r3) > 0 { 1 else 0 })
+
+    println("http_error_ok")
+}

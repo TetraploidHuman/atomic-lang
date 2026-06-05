@@ -38,6 +38,23 @@ use inkwell::types::{BasicMetadataTypeEnum, BasicTypeEnum, FunctionType, StructT
 use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, IntValue, PointerValue};
 use std::collections::{HashMap, HashSet};
 
+/// Return (mutex_size, cond_size) for the sync primitives on the target platform.
+/// These are byte-array sizes in the stream struct, cast to the real types at
+/// runtime.  Linux x86_64: pthread_mutex_t=40, pthread_cond_t=48.
+/// Linux ARM64:   pthread_mutex_t=48, pthread_cond_t=48.
+/// Windows:       CRITICAL_SECTION=40, CONDITION_VARIABLE=8.
+fn sync_primitive_sizes(target_triple: &Option<String>) -> (u32, u32) {
+    let is_windows = match target_triple {
+        None => cfg!(target_os = "windows"),
+        Some(t) => t.contains("windows"),
+    };
+    if is_windows {
+        (40, 8)
+    } else {
+        (40, 48)
+    }
+}
+
 // ---- Scope ----
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub(super) enum ValKind {
@@ -436,13 +453,18 @@ impl<'ctx> CodeGen<'ctx> {
             ],
             false,
         );
-        // Stream type: {mutex: [40 x i8], cond: [48 x i8], closed: i64, list: {ptr, i64, i64}}
+        // Stream type: {mutex, cond, closed: i64, list: {ptr, i64, i64}}
+        // Sizes vary by platform: Linux x86_64 uses pthread_mutex_t=40/pthread_cond_t=48,
+        // Linux ARM64 uses 48/48, Windows uses CRITICAL_SECTION=40/CONDITION_VARIABLE=8.
+        let (mutex_sz, cond_sz) = sync_primitive_sizes(&target_triple);
+        let stream_mutex_ty = context.i8_type().array_type(mutex_sz);
+        let stream_cond_ty = context.i8_type().array_type(cond_sz);
         let stream_type = context.struct_type(
             &[
-                context.i8_type().array_type(40).into(), // pthread_mutex_t = 40 bytes
-                context.i8_type().array_type(48).into(), // pthread_cond_t = 48 bytes
-                context.i64_type().into(),               // closed flag
-                list_type.into(),                        // data buffer list
+                stream_mutex_ty.into(),
+                stream_cond_ty.into(),
+                context.i64_type().into(), // closed flag
+                list_type.into(),          // data buffer list
             ],
             false,
         );
@@ -500,6 +522,15 @@ impl<'ctx> CodeGen<'ctx> {
 
     pub fn set_opt_level(&mut self, level: u8) {
         self.opt_level = level.min(3);
+    }
+
+    /// Check whether the compilation target is a Windows platform.
+    /// When target_triple is None (JIT / native mode), we check the host OS.
+    pub(super) fn is_target_windows(&self) -> bool {
+        match &self.target_triple {
+            None => cfg!(target_os = "windows"),
+            Some(t) => t.contains("windows"),
+        }
     }
 
     /// Convert Int or Float TypedValue to FloatValue (Int gets converted via sitofp).

@@ -54,6 +54,41 @@ fn run_example(name: &str) -> String {
     stdout.replace("\r\n", "\n").replace('\r', "")
 }
 
+fn run_example_with_stdin(name: &str, stdin_data: &str) -> String {
+    use std::io::Write;
+    let example = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("examples")
+        .join(name);
+    let mut child = Command::new(atomic_binary())
+        .args(["run", example.to_str().unwrap()])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .expect(&format!("Failed to spawn example: {}", name));
+
+    if let Some(ref mut stdin) = child.stdin {
+        stdin.write_all(stdin_data.as_bytes()).expect("Failed to write to stdin");
+    }
+
+    let output = child.wait_with_output().expect(&format!("Failed to run example: {}", name));
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    stdout.replace("\r\n", "\n").replace('\r', "")
+}
+
+/// Run an example and verify it exits successfully (ignoring output).
+/// Used for network-dependent tests where output is not deterministic.
+fn run_example_ok(name: &str) -> bool {
+    let example = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("examples")
+        .join(name);
+    let output = Command::new(atomic_binary())
+        .args(["run", example.to_str().unwrap()])
+        .output()
+        .expect(&format!("Failed to run example: {}", name));
+    output.status.success()
+}
+
 #[test]
 fn test_hello() {
     assert_eq!(run_example("hello.at"), "Hello, World!\n");
@@ -225,4 +260,169 @@ fn test_interp() {
         run_example("interp.at"),
         "Hello, World!Age: 42World is 42 years olddone"
     );
+}
+
+// ── read_line tests ──────────────────────────────────────
+
+#[test]
+fn test_read_line_with_input() {
+    assert_eq!(
+        run_example_with_stdin("io.at", "Alice\n"),
+        "Hello, Alice\n"
+    );
+}
+
+#[test]
+fn test_read_line_eof() {
+    // No stdin input → read_line returns None → unwrap_or uses "World"
+    assert_eq!(
+        run_example_with_stdin("io.at", ""),
+        "Hello, World\n"
+    );
+}
+
+#[test]
+fn test_read_line_multiple() {
+    assert_eq!(
+        run_example_with_stdin("read_line_multiple.at", "first line\nsecond line\n"),
+        "first line\nsecond line\n"
+    );
+}
+
+#[test]
+fn test_read_line_empty_line() {
+    assert_eq!(
+        run_example_with_stdin("read_line_empty.at", "\n"),
+        "Got empty line\n"
+    );
+}
+
+// ── Stability tests ────────────────────────────────────────────────
+
+#[test]
+fn test_stability_mergesort() {
+    assert_eq!(
+        run_example("stability_mergesort.at"),
+        "3\n9\n10\n27\n38\n43\n82\nmerge_sort_ok\n"
+    );
+}
+
+#[test]
+fn test_stability_closure_chain() {
+    assert_eq!(
+        run_example("stability_closure_chain.at"),
+        "17\n330\n360\n15\n35\nclosure_chain_ok\n"
+    );
+}
+
+#[test]
+fn test_stability_mapset() {
+    assert_eq!(
+        run_example("stability_mapset.at"),
+        "4\n1\n20\n4\n6\n2\n2\nmapset_ok\n"
+    );
+}
+
+#[test]
+fn test_stability_string_transform() {
+    assert_eq!(
+        run_example("stability_string_transform.at"),
+        "Hello, Atomic!\nAtomic! Hello,\nHello\nHELLO, ATOMIC!\nhello, atomic!\nFOO BAR BAZ\nstring_transform_ok\n"
+    );
+}
+
+#[test]
+fn test_stability_enum_match() {
+    assert_eq!(
+        run_example("stability_enum_match.at"),
+        "42\n-7\n5\n30\n20\n-2\nenum_match_ok\n"
+    );
+}
+
+#[test]
+fn test_stability_for_comprehension() {
+    assert_eq!(
+        run_example("stability_for_comprehension.at"),
+        "10\n1\n100\n10\n1\n19\n5\n9\n11\n41\nfor_comprehension_ok\n"
+    );
+}
+
+#[test]
+fn test_stability_collatz() {
+    assert_eq!(
+        run_example("stability_collatz.at"),
+        "0\n1\n7\n8\n111\n324\ncollatz_ok\n"
+    );
+}
+
+#[test]
+fn test_stability_roman() {
+    assert_eq!(
+        run_example("stability_roman.at"),
+        "1\n1\n1\n0\n1\n120\n3628800\nroman_recursion_ok\n"
+    );
+}
+
+#[test]
+fn test_stability_prime() {
+    assert_eq!(
+        run_example("stability_prime.at"),
+        "25\n2\n11\n29\n229\n10\nprime_ok\n"
+    );
+}
+
+#[test]
+fn test_stability_nested_struct() {
+    assert_eq!(
+        run_example("stability_nested_struct.at"),
+        "1\n30\n2\n10001\n31\n2\nnested_struct_ok\n"
+    );
+}
+
+#[test]
+fn test_stability_generic_algo() {
+    assert_eq!(
+        run_example("stability_generic_algo.at"),
+        "1\n8\n8\n15\n120\ngeneric_algo_ok\n"
+    );
+}
+
+#[test]
+fn test_stability_kitchen_sink() {
+    assert_eq!(
+        run_example("stability_kitchen_sink.at"),
+        "0\n1\n5\n55\n20\n100\n3\n120\nok\n10\n20\n99\n30\n55\n70\nHELLO ATOMIC\n42\n3.14\n1\n7\nkitchen_sink_ok\n"
+    );
+}
+
+// ── HTTP / Networking stability tests ───────────────────────────────
+
+#[test]
+#[ignore = "requires network access"]
+fn test_stability_http_get() {
+    assert!(run_example_ok("stability_http_get.at"));
+}
+
+#[test]
+#[ignore = "requires network access"]
+fn test_stability_http_post() {
+    assert!(run_example_ok("stability_http_post.at"));
+}
+
+#[test]
+fn test_stability_http_error() {
+    // Error handling test: connection refused is deterministic (no network needed)
+    assert!(run_example_ok("stability_http_error.at"));
+}
+
+#[test]
+#[ignore = "requires network access"]
+fn test_stability_http_methods() {
+    assert!(run_example_ok("stability_http_methods.at"));
+}
+
+#[test]
+#[ignore = "requires network access"]
+fn test_stability_deepseek() {
+    assert!(run_example_ok("stability_deepseek.at"));
 }

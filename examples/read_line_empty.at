@@ -1,0 +1,6 @@
+// read_line empty line: read_line returns the empty string for a blank line
+fun main() {
+    val line = unwrap_or(read_line(), "NOT_EMPTY")
+    val result = when line == "" { "Got empty line" else "Got: " + line }
+    println(result)
+}

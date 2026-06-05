@@ -1,0 +1,33 @@
+// Stability test: complex map/set operations
+fun main() {
+    val m1 = Map["a": 1, "b": 2, "c": 3]
+    val m2 = Map["b": 20, "d": 4]
+
+    val merged = map_union(m1, m2)
+    val keys = map_keys(merged)
+    val vals = map_values(merged)
+
+    // Keys should include "a","b","c","d" (4 keys)
+    print(len(keys))
+
+    // Lookup values through get
+    val av = get(m1, "a", 0)
+    val bv = get(merged, "b", 0)
+    val dv = get(merged, "d", 0)
+    print(av)
+    print(bv)
+    print(dv)
+
+    // Set operations
+    val s1 = Set[1, 2, 3, 4]
+    val s2 = Set[3, 4, 5, 6]
+    val union = set_union(s1, s2)
+    val inter = set_intersection(s1, s2)
+    val diff = set_difference(s1, s2)
+
+    print(len(union))
+    print(len(inter))
+    print(len(diff))
+
+    println("mapset_ok")
+}

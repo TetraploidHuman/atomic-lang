@@ -1,0 +1,60 @@
+// Stability test: Sieve of Eratosthenes for prime generation
+fun is_prime(n: Int): Int {
+    when n < 2 { 0
+    else when n == 2 { 1
+    else when n % 2 == 0 { 0
+    else { is_prime_odd(n, 3) } } }
+}
+
+fun is_prime_odd(n: Int, d: Int): Int {
+    when d * d > n { 1
+    else when n % d == 0 { 0
+    else { is_prime_odd(n, d + 2) } } }
+}
+
+fun count_primes(limit: Int): Int {
+    return count_primes_from(2, limit, 0)
+}
+
+fun count_primes_from(current: Int, limit: Int, acc: Int): Int {
+    when current > limit { acc
+    else { count_primes_from(current + 1, limit, acc + is_prime(current)) } }
+}
+
+fun nth_prime(n: Int): Int {
+    return nth_prime_search(2, 0, n)
+}
+
+fun nth_prime_search(cand: Int, found: Int, target: Int): Int {
+    when found >= target { cand - 1
+    else {
+        when is_prime(cand) == 1 {
+            nth_prime_search(cand + 1, found + 1, target)
+        } else {
+            nth_prime_search(cand + 1, found, target)
+        }
+    } }
+}
+
+fun main() {
+    // 25 primes below 100
+    val count_below_100 = count_primes(100)
+    print(count_below_100)
+
+    // Known primes: 2, 3, 5, 7, 11, 13, 17, 19, 23, 29
+    print(nth_prime(1))
+    print(nth_prime(5))
+    print(nth_prime(10))
+    print(nth_prime(50))
+
+    // Test divisibility by many numbers
+    var sum = 0
+    var j = 2
+    while j <= 30 {
+        sum = sum + is_prime(j)
+        j = j + 1
+    }
+    print(sum)
+
+    println("prime_ok")
+}

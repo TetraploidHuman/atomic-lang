@@ -1,0 +1,35 @@
+// Stability test: function composition and chained closures
+fun compose(f, g) {
+    { x -> f(g(x)) }
+}
+
+fun add2(x) {
+    x + 2
+}
+
+fun mul3(x) {
+    x * 3
+}
+
+fun main() {
+    // Compose: add2(mul3(x)) → 3*x + 2
+    val f = compose(::add2, ::mul3)
+    print(f(5))
+
+    // Nested lambda with capture
+    val base = 100
+    val adder = { x -> x + base }
+    val multer = { x -> x * 3 }
+    val chain = { x -> multer(adder(x)) }
+
+    print(chain(10))
+    print(chain(20))
+
+    // Lambda returning lambda
+    val make_adder = { n -> { x -> x + n } }
+    val add10 = make_adder(10)
+    print(add10(5))
+    print(add10(25))
+
+    println("closure_chain_ok")
+}

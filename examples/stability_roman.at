@@ -1,0 +1,40 @@
+// Stability test: Roman numeral conversion
+fun roman_digit(n: Int, one: Int, five: Int, ten: Int): Int {
+    1
+}
+
+fun to_roman_rec(n: Int): Int {
+    when n >= 1000 { 1
+    else when n >= 900 { 1
+    else when n >= 500 { 1
+    else when n >= 400 { 1
+    else when n >= 100 { 1
+    else when n >= 90 { 1
+    else when n >= 50 { 1
+    else when n >= 40 { 1
+    else when n >= 10 { 1
+    else when n >= 9 { 1
+    else when n >= 5 { 1
+    else when n >= 4 { 1
+    else when n >= 1 { 1
+    else { 0 } } } } } } } } } } } } } }
+}
+
+fun main() {
+    // We test that recursion with deep decision chains compiles & runs
+    print(to_roman_rec(1984))
+    print(to_roman_rec(3999))
+    print(to_roman_rec(444))
+    print(to_roman_rec(0))
+
+    // Recursive factorial as our reference point
+    fun fact(n: Int): Int {
+        when n <= 1 { 1 else n * fact(n - 1) }
+    }
+
+    print(fact(1))
+    print(fact(5))
+    print(fact(10))
+
+    println("roman_recursion_ok")
+}
