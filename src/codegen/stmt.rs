@@ -975,7 +975,13 @@ impl<'ctx> CodeGen<'ctx> {
         if current_block.get_terminator().is_none() {
             let llvm_void: bool = function.get_type().get_return_type().is_none();
 
-            if llvm_void {
+            if name == "main" {
+                // main must return i32 so the CRT gets the exit code.
+                // The function body's last expression is irrelevant; always return 0.
+                let _ = self
+                    .builder
+                    .build_return(Some(&self.i64_ty().const_int(0, false)));
+            } else if llvm_void {
                 let _ = self.builder.build_return(None);
             } else {
                 match &result {

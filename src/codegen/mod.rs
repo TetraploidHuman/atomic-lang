@@ -1064,7 +1064,7 @@ impl<'ctx> CodeGen<'ctx> {
                     .map(|p| self.ast_type_to_llvm(p.ty.as_ref()))
                     .collect();
                 let ret_type = if name == "main" {
-                    None
+                    Some(Type::Named("Int".into()))
                 } else {
                     return_type.as_ref().cloned().or_else(|| {
                         if all_typed {
@@ -1161,7 +1161,7 @@ impl<'ctx> CodeGen<'ctx> {
         // If no explicit main, create one first so that top-level
         // Let/Val/Expr statements compile into the correct function.
         if !has_main {
-            let main_fn = self.void_ty().fn_type(&[], false);
+            let main_fn = self.i64_ty().fn_type(&[], false);
             let main_func = self.module.add_function("main", main_fn, None);
             let entry = self.context.append_basic_block(main_func, "entry");
             self.builder.position_at_end(entry);
@@ -1180,7 +1180,7 @@ impl<'ctx> CodeGen<'ctx> {
                     }
                 }
             }
-            let _ = self.builder.build_return(None);
+            let _ = self.builder.build_return(Some(&self.i64_ty().const_int(0, false)));
         } else {
             for stmt in &program.stmts {
                 self.compile_stmt(stmt)?;

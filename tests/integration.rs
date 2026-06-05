@@ -2,21 +2,25 @@ use std::path::PathBuf;
 use std::process::Command;
 
 fn atomic_binary() -> PathBuf {
-    // Use CARGO_BIN_EXE_atomic when running under cargo test (most reliable)
+    // CARGO_BIN_EXE_atomic is set by cargo test itself — trust it unconditionally.
     if let Ok(path) = std::env::var("CARGO_BIN_EXE_atomic") {
-        let p = PathBuf::from(&path);
-        if p.exists() {
-            return p;
-        }
+        return PathBuf::from(&path);
     }
 
     let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target");
-    let exe_suffix = if cfg!(target_os = "windows") { ".exe" } else { "" };
+    let exe_suffix = if cfg!(target_os = "windows") {
+        ".exe"
+    } else {
+        ""
+    };
 
     let candidates: &[&str] = if cfg!(target_os = "windows") {
         &["x86_64-pc-windows-msvc/debug/atomic"]
     } else {
-        &["x86_64-unknown-linux-gnu/debug/atomic", "aarch64-unknown-linux-gnu/debug/atomic"]
+        &[
+            "x86_64-unknown-linux-gnu/debug/atomic",
+            "aarch64-unknown-linux-gnu/debug/atomic",
+        ]
     };
 
     for c in candidates {

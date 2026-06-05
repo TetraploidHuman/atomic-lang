@@ -181,9 +181,9 @@ fn run_via_jit(cg: &CodeGen) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
 
     unsafe {
-        let main: inkwell::execution_engine::JitFunction<unsafe extern "C" fn()> =
+        let main: inkwell::execution_engine::JitFunction<unsafe extern "C" fn() -> u64> =
             engine.get_function("main").map_err(|e| e.to_string())?;
-        main.call();
+        let _exit_code = main.call();
         extern "C" {
             fn fflush(stream: *mut std::ffi::c_void) -> std::ffi::c_int;
         }
