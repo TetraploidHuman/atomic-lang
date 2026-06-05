@@ -2,21 +2,36 @@ use std::path::PathBuf;
 use std::process::Command;
 
 fn atomic_binary() -> PathBuf {
-    let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target");
-
-    let candidates = [
-        // Specific target dirs (when built with --target)
-        base.join("x86_64-unknown-linux-gnu/debug/atomic"),
-        base.join("aarch64-unknown-linux-gnu/debug/atomic"),
-        // Default (no --target)
-        base.join("debug/atomic"),
-    ];
-
-    for p in &candidates {
+    // Use CARGO_BIN_EXE_atomic when running under cargo test (most reliable)
+    if let Ok(path) = std::env::var("CARGO_BIN_EXE_atomic") {
+        let p = PathBuf::from(&path);
         if p.exists() {
-            return p.clone();
+            return p;
         }
     }
+
+    let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target");
+    let exe_suffix = if cfg!(target_os = "windows") { ".exe" } else { "" };
+
+    let candidates: &[&str] = if cfg!(target_os = "windows") {
+        &["x86_64-pc-windows-msvc/debug/atomic"]
+    } else {
+        &["x86_64-unknown-linux-gnu/debug/atomic", "aarch64-unknown-linux-gnu/debug/atomic"]
+    };
+
+    for c in candidates {
+        let p = base.join(format!("{}{}", c, exe_suffix));
+        if p.exists() {
+            return p;
+        }
+    }
+
+    // Fallback: default target dir (no --target)
+    let p = base.join(format!("debug/atomic{}", exe_suffix));
+    if p.exists() {
+        return p;
+    }
+
     panic!("atomic binary not found — build with `cargo build` first");
 }
 
