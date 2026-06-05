@@ -9,7 +9,7 @@ path = "src/main.rs"
 
 [dependencies]
 inkwell = { version = "0.9", features = ["llvm21-1"] }
-llvm-sys = { version = "211", features = ["disable-alltargets-init"] }
+llvm-sys = { version = "211", features = ["disable-alltargets-init", "prefer-dynamic"] }
 clap = { version = "4", features = ["derive"] }
 ariadne = "0.4"
 toml = "1.0"
