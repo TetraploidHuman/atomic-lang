@@ -150,13 +150,9 @@ impl<'ctx> CodeGen<'ctx> {
             return Err(format!("LLVM module verification failed: {}", e));
         }
 
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "windows"))]
         {
             run_via_jit(self)
-        }
-        #[cfg(target_os = "windows")]
-        {
-            run_via_clang(self)
         }
         #[cfg(not(any(target_os = "linux", target_os = "windows")))]
         {
@@ -167,6 +163,7 @@ impl<'ctx> CodeGen<'ctx> {
 
 #[cfg(any(
     target_os = "linux",
+    target_os = "windows",
     not(any(target_os = "linux", target_os = "windows"))
 ))]
 fn run_via_jit(cg: &CodeGen) -> Result<(), String> {
