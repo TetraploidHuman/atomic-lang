@@ -20,9 +20,8 @@ jobs:
       matrix:
         include:
           - name: Linux x64
-            os: ubuntu-24.04
+            os: self-hosted
             target: x86_64-unknown-linux-gnu
-            llvm_archive: LLVM-21.1.8-Linux-X64.tar.xz
 
           - name: Windows x64
             os: windows-2025
@@ -36,25 +35,13 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      # ── System deps (Linux) ───────────────────────────
-      - name: Install deps (Linux)
+      # ── Nix shell (self-hosted Linux) ─────────────────
+      # All deps (LLVM, libffi, zlib, etc.) come from shell.nix.
+      # Wrap subsequent cargo commands in: nix-shell --run "..."
+      - name: Verify nix-shell
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq libffi-dev zlib1g-dev
-
-      # ── LLVM ──────────────────────────────────────────
-      - name: Setup LLVM (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          URL="https://github.com/llvm/llvm-project/releases/download/${{ env.LLVM_TAG }}/${{ matrix.llvm_archive }}"
-          echo "Downloading $URL"
-          mkdir -p /tmp/llvm
-          curl -fSL --retry 3 --connect-timeout 30 "$URL" -o /tmp/llvm.tar.xz
-          tar xf /tmp/llvm.tar.xz -C /tmp/llvm --strip-components=1
-          rm -f /tmp/llvm.tar.xz
-          echo "LLVM_SYS_211_PREFIX=/tmp/llvm" >> "$GITHUB_ENV"
-          echo "/tmp/llvm/bin" >> "$GITHUB_PATH"
+          nix-shell --run "echo 'LLVM:' && llvm-config --version && echo 'Rust:' && rustc --version"
 
       - name: Setup LLVM (Windows)
         if: runner.os == 'Windows'
@@ -89,11 +76,16 @@ jobs:
 
       # ── Build (debug is fine for CI) ──────────────────
       - name: Build
+        if: runner.os == 'Windows'
         run: cargo build --target ${{ matrix.target }}
+      - name: Build (Linux)
+        if: runner.os == 'Linux'
+        run: nix-shell --run "cargo build --target ${{ matrix.target }}"
 
       # ── Smoke test (check) ────────────────────────────
       - name: Smoke test (check)
         shell: bash
+        if: runner.os == 'Windows'
         run: |
           ATOMIC="target/${{ matrix.target }}/debug/atomic"
           if [ "${{ runner.os }}" = "Windows" ]; then
@@ -102,22 +94,34 @@ jobs:
           echo "Running $ATOMIC check examples/hello.at"
           "$ATOMIC" check examples/hello.at
           echo "Smoke test passed."
+      - name: Smoke test (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          nix-shell --run './target/${{ matrix.target }}/debug/atomic check examples/hello.at'
+          echo "Smoke test passed."
 
       # ── Test ──────────────────────────────────────────
-      - name: Test
+      - name: Test (Windows)
+        if: runner.os == 'Windows'
         run: cargo test --target ${{ matrix.target }}
+      - name: Test (Linux)
+        if: runner.os == 'Linux'
+        run: nix-shell --run "cargo test --target ${{ matrix.target }}"
 
       # ── Debug: show run output on failure ──────────────
-      - name: Debug run output
-        if: failure()
+      - name: Debug run output (Windows)
+        if: failure() && runner.os == 'Windows'
         shell: pwsh
         run: |
-          $atomic = "target/${{ matrix.target }}/debug/atomic"
-          if ("${{ runner.os }}" -eq "Windows") { $atomic += ".exe" }
+          $atomic = "target/${{ matrix.target }}/debug/atomic.exe"
           Write-Host "Running $atomic run examples/hello.at"
           & $atomic run examples/hello.at *>&1 | Tee-Object -FilePath atomic_run_output.txt
           Write-Host "Exit code: $LASTEXITCODE"
           Get-Content atomic_run_output.txt
+      - name: Debug run output (Linux)
+        if: failure() && runner.os == 'Linux'
+        run: |
+          nix-shell --run './target/${{ matrix.target }}/debug/atomic run examples/hello.at' 2>&1 | tee atomic_run_output.txt
       - name: Upload run output
         if: failure()
         uses: actions/upload-artifact@v4
