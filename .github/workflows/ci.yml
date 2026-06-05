@@ -54,6 +54,7 @@ jobs:
           tar xf /tmp/llvm.tar.xz -C /tmp/llvm --strip-components=1
           rm -f /tmp/llvm.tar.xz
           echo "LLVM_SYS_211_PREFIX=/tmp/llvm" >> "$GITHUB_ENV"
+          echo "/tmp/llvm/bin" >> "$GITHUB_PATH"
 
       - name: Setup LLVM (Windows)
         if: runner.os == 'Windows'
@@ -74,6 +75,7 @@ jobs:
           }
           Remove-Item C:\llvm-extract -Recurse -Force -ErrorAction SilentlyContinue
           echo "LLVM_SYS_211_PREFIX=C:\llvm" >> $env:GITHUB_ENV
+          echo "C:\llvm\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Create libxml2 stub (Windows)
         if: runner.os == 'Windows'
@@ -89,22 +91,39 @@ jobs:
       - name: Build
         run: cargo build --target ${{ matrix.target }}
 
-      # ── Test (Linux only — tests need JIT/execution) ──
+      # ── Smoke test (check) ────────────────────────────
+      - name: Smoke test (check)
+        shell: bash
+        run: |
+          ATOMIC="target/${{ matrix.target }}/debug/atomic"
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            ATOMIC="$ATOMIC.exe"
+          fi
+          echo "Running $ATOMIC check examples/hello.at"
+          "$ATOMIC" check examples/hello.at
+          echo "Smoke test passed."
+
+      # ── Test ──────────────────────────────────────────
       - name: Test
-        if: runner.os == 'Linux'
         run: cargo test --target ${{ matrix.target }}
 
-      # ── Type-check examples ───────────────────────────
-      - name: Type-check examples
-        if: runner.os == 'Linux'
+      # ── Debug: show run output on failure ──────────────
+      - name: Debug run output
+        if: failure()
+        shell: pwsh
         run: |
-          echo "::group::Building atomic binary"
-          cargo build --target ${{ matrix.target }}
-          echo "::endgroup::"
-          for f in examples/*.at; do
-            echo "Checking $f..."
-            cargo run --target ${{ matrix.target }} -- run "$f" --check 2>&1 || echo "::warning::Type check failed for $f"
-          done
+          $atomic = "target/${{ matrix.target }}/debug/atomic"
+          if ("${{ runner.os }}" -eq "Windows") { $atomic += ".exe" }
+          Write-Host "Running $atomic run examples/hello.at"
+          & $atomic run examples/hello.at *>&1 | Tee-Object -FilePath atomic_run_output.txt
+          Write-Host "Exit code: $LASTEXITCODE"
+          Get-Content atomic_run_output.txt
+      - name: Upload run output
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: run-output-${{ matrix.name }}-${{ github.run_id }}
+          path: atomic_run_output.txt
 
   lint:
     name: Lint & fmt
