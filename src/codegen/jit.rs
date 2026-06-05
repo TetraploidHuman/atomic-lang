@@ -76,7 +76,11 @@ fn map_host_symbols(cg: &CodeGen, engine: &inkwell::execution_engine::ExecutionE
         fn atomic_http_free(_: *mut std::ffi::c_char);
         fn atomic_test_ping() -> i64;
     }
-    for name in ["atomic_http_request", "atomic_http_free", "atomic_test_ping"] {
+    for name in [
+        "atomic_http_request",
+        "atomic_http_free",
+        "atomic_test_ping",
+    ] {
         if let Some(func) = cg.module.get_function(name) {
             let addr = match name {
                 "atomic_http_request" => atomic_http_request as *const () as usize,
