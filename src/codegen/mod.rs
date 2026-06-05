@@ -1180,7 +1180,9 @@ impl<'ctx> CodeGen<'ctx> {
                     }
                 }
             }
-            let _ = self.builder.build_return(Some(&self.i64_ty().const_int(0, false)));
+            let _ = self
+                .builder
+                .build_return(Some(&self.i64_ty().const_int(0, false)));
         } else {
             for stmt in &program.stmts {
                 self.compile_stmt(stmt)?;
