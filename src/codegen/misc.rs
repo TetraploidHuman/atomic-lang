@@ -1036,19 +1036,21 @@ impl<'ctx> CodeGen<'ctx> {
             .build_conditional_branch(is_ok, ok_block, fail_block)
             .map_err(llvm_err)?;
 
-        // On failure: if the function returns an enum type, early-return with the error.
-        // If the function returns void (e.g. main), fall back to producing the enum value.
-        let fn_returns_void = current_fn.get_type().get_return_type().is_none();
+        // On failure: if the function returns the same enum type,
+        // propagate (early-return with the error / None).
+        // Otherwise (void, i64, etc.) produce the enum value.
+        let fn_ret_ty = current_fn.get_type().get_return_type();
+        let should_propagate = fn_ret_ty == Some(bt);
         self.builder.position_at_end(fail_block);
-        if fn_returns_void {
+        if should_propagate {
+            let _ = self.builder.build_return(Some(&loaded));
+        } else {
             self.builder
                 .build_store(result_alloca, loaded)
                 .map_err(llvm_err)?;
             self.builder
                 .build_unconditional_branch(merge_block)
                 .map_err(llvm_err)?;
-        } else {
-            let _ = self.builder.build_return(Some(&loaded));
         }
 
         // On success: unwrap inner value, access field, wrap in Some/Ok
@@ -1221,19 +1223,21 @@ impl<'ctx> CodeGen<'ctx> {
             .build_conditional_branch(is_ok, ok_block, fail_block)
             .map_err(llvm_err)?;
 
-        // On failure: if the function returns an enum type, early-return with the error.
-        // If the function returns void (e.g. main), fall back to producing the enum value.
-        let fn_returns_void = current_fn.get_type().get_return_type().is_none();
+        // On failure: if the function returns the same enum type,
+        // propagate (early-return with the error / None).
+        // Otherwise (void, i64, etc.) produce the enum value.
+        let fn_ret_ty = current_fn.get_type().get_return_type();
+        let should_propagate = fn_ret_ty == Some(bt);
         self.builder.position_at_end(fail_block);
-        if fn_returns_void {
+        if should_propagate {
+            let _ = self.builder.build_return(Some(&loaded));
+        } else {
             self.builder
                 .build_store(result_alloca, loaded)
                 .map_err(llvm_err)?;
             self.builder
                 .build_unconditional_branch(merge_block)
                 .map_err(llvm_err)?;
-        } else {
-            let _ = self.builder.build_return(Some(&loaded));
         }
 
         // On success: unwrap inner value, call method, wrap result in Some/Ok

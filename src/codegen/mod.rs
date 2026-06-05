@@ -1180,6 +1180,11 @@ impl<'ctx> CodeGen<'ctx> {
                     }
                 }
             }
+            if let Some(fflush_fn) = self.module.get_function("fflush") {
+                let _ =
+                    self.builder
+                        .build_call(fflush_fn, &[self.ptr_ty().const_null().into()], "");
+            }
             let _ = self
                 .builder
                 .build_return(Some(&self.i64_ty().const_int(0, false)));

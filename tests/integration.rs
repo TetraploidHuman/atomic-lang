@@ -48,8 +48,10 @@ fn run_example(name: &str) -> String {
         .output()
         .expect(&format!("Failed to run example: {}", name));
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    // Normalize CRLF -> LF so tests pass on Windows where CRT emits \r\n
-    stdout.replace("\r\n", "\n")
+    // Normalize CRLF -> LF so tests pass on Windows where CRT emits \r\n.
+    // Strip all \r to handle cases where git CRLF conversion adds an extra
+    // carriage return (e.g. multiline string literals in .at source files).
+    stdout.replace("\r\n", "\n").replace('\r', "")
 }
 
 #[test]
