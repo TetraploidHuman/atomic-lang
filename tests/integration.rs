@@ -47,7 +47,9 @@ fn run_example(name: &str) -> String {
         .args(["run", example.to_str().unwrap()])
         .output()
         .expect(&format!("Failed to run example: {}", name));
-    String::from_utf8_lossy(&output.stdout).to_string()
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    // Normalize CRLF -> LF so tests pass on Windows where CRT emits \r\n
+    stdout.replace("\r\n", "\n")
 }
 
 #[test]

@@ -976,8 +976,15 @@ impl<'ctx> CodeGen<'ctx> {
             let llvm_void: bool = function.get_type().get_return_type().is_none();
 
             if name == "main" {
-                // main must return i32 so the CRT gets the exit code.
-                // The function body's last expression is irrelevant; always return 0.
+                // Flush stdout before exit so buffered printf output is written
+                // even when the program uses print() (no newline) on Windows.
+                if let Some(fflush_fn) = self.module.get_function("fflush") {
+                    let _ = self.builder.build_call(
+                        fflush_fn,
+                        &[self.ptr_ty().const_null().into()],
+                        "",
+                    );
+                }
                 let _ = self
                     .builder
                     .build_return(Some(&self.i64_ty().const_int(0, false)));
