@@ -9483,6 +9483,9 @@ impl<'ctx> CodeGen<'ctx> {
                 if !args.is_empty() {
                     return Err("read_line expects no arguments".to_string());
                 }
+                if self.module.get_function("atomic_read_line").is_none() {
+                    self.emit_read_line_runtime()?;
+                }
                 let cc = self.call_rt("atomic_read_line", &[])?;
                 let result_struct = cc
                     .try_as_basic_value()
@@ -12568,6 +12571,9 @@ impl<'ctx> CodeGen<'ctx> {
             "read_dir" => {
                 if args.len() != 1 {
                     return Err("read_dir expects 1 argument (path)".to_string());
+                }
+                if self.module.get_function("atomic_read_dir").is_none() {
+                    self.emit_read_dir_runtime()?;
                 }
                 let v = self.compile_expr(&args[0])?;
                 match v {
