@@ -31,6 +31,17 @@ fn run_via_jit(cg: &CodeGen) -> Result<(), String> {
         .create_jit_execution_engine(opt)
         .map_err(|e| e.to_string())?;
 
+    // Map @stdin to the real libc stdin so that read_line() works on
+    // platforms where dlsym(RTLD_DEFAULT) cannot resolve "stdin" (NixOS).
+    if let Some(stdin_g) = cg.module.get_global("stdin") {
+        unsafe {
+            extern "C" {
+                static stdin: *mut std::ffi::c_void;
+            }
+            engine.add_global_mapping(&stdin_g, &stdin as *const _ as usize);
+        }
+    }
+
     unsafe {
         let main: inkwell::execution_engine::JitFunction<unsafe extern "C" fn() -> u64> =
             engine.get_function("main").map_err(|e| e.to_string())?;
