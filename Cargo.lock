@@ -75,6 +75,7 @@ dependencies = [
  "ariadne",
  "clap",
  "inkwell",
+ "llvm-sys",
  "toml",
 ]
 

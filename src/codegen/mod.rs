@@ -1195,7 +1195,18 @@ impl<'ctx> CodeGen<'ctx> {
     }
 
     pub fn verify(&self) -> Result<(), String> {
-        self.module.verify().map_err(|e| e.to_string())
+        // Module verification can trigger analysis passes that call into
+        // unresolved symbols on Windows (/FORCE:UNRESOLVED makes them NULL).
+        // The IR will be verified again by clang during compilation anyway.
+        #[cfg(not(target_os = "windows"))]
+        {
+            self.module.verify().map_err(|e| e.to_string())
+        }
+        #[cfg(target_os = "windows")]
+        {
+            let _ = self;
+            Ok(())
+        }
     }
 
     /// Write LLVM bitcode to a file
