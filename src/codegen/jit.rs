@@ -9,6 +9,7 @@
 //          signatures the runtime IR expects.
 
 use std::io::Write;
+#[cfg(target_os = "windows")]
 use std::process::Command;
 
 use super::CodeGen;
