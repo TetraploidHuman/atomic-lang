@@ -31,16 +31,11 @@ fn run_via_jit(cg: &CodeGen) -> Result<(), String> {
         .create_jit_execution_engine(opt)
         .map_err(|e| e.to_string())?;
 
-    // Map @stdin to the real libc stdin so that read_line() works on
-    // platforms where dlsym(RTLD_DEFAULT) cannot resolve "stdin" (NixOS).
-    if let Some(stdin_g) = cg.module.get_global("stdin") {
-        unsafe {
-            extern "C" {
-                static stdin: *mut std::ffi::c_void;
-            }
-            engine.add_global_mapping(&stdin_g, &stdin as *const _ as usize);
-        }
-    }
+    // Map host-provided runtime functions so the JIT can find them via
+    // the symbol address rather than relying on dlsym(RTLD_DEFAULT).
+    // Needed on NixOS where symbols in the main binary may not be
+    // exported to the dynamic symbol table.
+    map_host_symbols(cg, &engine);
 
     unsafe {
         let main: inkwell::execution_engine::JitFunction<unsafe extern "C" fn() -> u64> =
@@ -53,4 +48,43 @@ fn run_via_jit(cg: &CodeGen) -> Result<(), String> {
     }
     std::io::stdout().flush().ok();
     Ok(())
+}
+
+fn map_host_symbols(cg: &CodeGen, engine: &inkwell::execution_engine::ExecutionEngine) {
+    // Map @stdin global to real libc stdin address.
+    if let Some(stdin_g) = cg.module.get_global("stdin") {
+        unsafe {
+            extern "C" {
+                static stdin: *mut std::ffi::c_void;
+            }
+            engine.add_global_mapping(&stdin_g, &stdin as *const _ as usize);
+        }
+    }
+
+    // Map host-provided runtime functions that the module declares as
+    // external. These are defined with #[no_mangle] in Rust and need to
+    // be made visible to the JIT.
+    // Declared in src/http_runtime.rs
+    extern "C" {
+        fn atomic_http_request(
+            _: *const std::ffi::c_char,
+            _: *const std::ffi::c_char,
+            _: *const std::ffi::c_char,
+            _: *const std::ffi::c_char,
+            _: i64,
+        ) -> *mut std::ffi::c_char;
+        fn atomic_http_free(_: *mut std::ffi::c_char);
+        fn atomic_test_ping() -> i64;
+    }
+    for name in ["atomic_http_request", "atomic_http_free", "atomic_test_ping"] {
+        if let Some(func) = cg.module.get_function(name) {
+            let addr = match name {
+                "atomic_http_request" => atomic_http_request as *const () as usize,
+                "atomic_http_free" => atomic_http_free as *const () as usize,
+                "atomic_test_ping" => atomic_test_ping as *const () as usize,
+                _ => continue,
+            };
+            engine.add_global_mapping(&func, addr);
+        }
+    }
 }

@@ -11386,11 +11386,7 @@ impl<'ctx> CodeGen<'ctx> {
         let rl_fn =
             self.module
                 .add_function("atomic_read_line", rl_ret_ty.fn_type(&[], false), None);
-        let fgets_fn = self.module.add_function(
-            "fgets",
-            ptr.fn_type(&[ptr.into(), i32.into(), ptr.into()], false),
-            None,
-        );
+        let fgets_fn = self.module.get_function("fgets").unwrap();
         let entry = self.context.append_basic_block(rl_fn, "entry");
         self.builder.position_at_end(entry);
         let buf_size = i64.const_int(4096, false);
