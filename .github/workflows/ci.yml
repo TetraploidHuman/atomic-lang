@@ -35,6 +35,19 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.name }}
+
+      # ── LLVM cache (Windows) ──────────────────────────
+      - name: Cache LLVM (Windows)
+        if: runner.os == 'Windows'
+        id: llvm-cache
+        uses: actions/cache@v4
+        with:
+          path: C:\llvm
+          key: llvm-${{ env.LLVM_VERSION }}-${{ matrix.target }}
+
       # ── Nix shell (self-hosted Linux) ─────────────────
       # All deps (LLVM, libffi, zlib, etc.) come from shell.nix.
       # Wrap subsequent cargo commands in: nix-shell --run "..."
@@ -43,8 +56,8 @@ jobs:
         run: |
           nix-shell --run "echo 'LLVM:' && llvm-config --version && echo 'Rust:' && rustc --version"
 
-      - name: Setup LLVM (Windows)
-        if: runner.os == 'Windows'
+      - name: Download LLVM (Windows)
+        if: runner.os == 'Windows' && steps.llvm-cache.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           $URL = "https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.8/${{ matrix.llvm_archive }}"
@@ -61,6 +74,11 @@ jobs:
             Rename-Item C:\llvm-extract C:\llvm -Force
           }
           Remove-Item C:\llvm-extract -Recurse -Force -ErrorAction SilentlyContinue
+
+      - name: Set LLVM env (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
           echo "LLVM_SYS_211_PREFIX=C:\llvm" >> $env:GITHUB_ENV
           echo "C:\llvm\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
