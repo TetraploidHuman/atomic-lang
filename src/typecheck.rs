@@ -461,6 +461,9 @@ impl TypeChecker {
                     if let Err(e) = self.check_when_arms(arms) {
                         errors.push(e);
                     }
+                    if let Err(msg) = self.registry.check_when_exhaustive(arms) {
+                        errors.push(CompilerError::new(msg).with_span(self.current_span));
+                    }
                     for arm in arms {
                         self.collect_expr_errors(&arm.body, errors);
                     }
@@ -852,7 +855,7 @@ impl TypeChecker {
     /// Check if two types are structurally compatible
     fn types_compatible(&self, declared: &Type, inferred: &Type) -> bool {
         match (declared, inferred) {
-            (Type::Unit, _) | (_, Type::Unit) => true,
+            (Type::Unit, Type::Unit) => true,
             (Type::Named(a), Type::Named(b)) => {
                 if a == b {
                     return true;

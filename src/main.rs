@@ -515,8 +515,13 @@ fn resolve_imports(program: &Program, search_dirs: &[PathBuf]) -> Result<Vec<Stm
                             || items.as_ref().map_or(false, |its| its.contains(name));
                         let export_filter = exported.as_ref().map_or(true, |e| e.contains(name));
                         if item_filter || (items.is_none() && export_filter) {
+                            let imported_name = if items.is_some() {
+                                name.clone()
+                            } else {
+                                format!("{}_{}", prefix, name)
+                            };
                             extra_stmts.push(Stmt::TypeAlias {
-                                name: name.clone(),
+                                name: imported_name,
                                 type_params: type_params.clone(),
                                 definition: definition.clone(),
                                 span: Span::default(),
@@ -533,8 +538,13 @@ fn resolve_imports(program: &Program, search_dirs: &[PathBuf]) -> Result<Vec<Stm
                             || items.as_ref().map_or(false, |its| its.contains(name));
                         let export_filter = exported.as_ref().map_or(true, |e| e.contains(name));
                         if item_filter || (items.is_none() && export_filter) {
+                            let imported_name = if items.is_some() {
+                                name.clone()
+                            } else {
+                                format!("{}_{}", prefix, name)
+                            };
                             extra_stmts.push(Stmt::Enum {
-                                name: name.clone(),
+                                name: imported_name,
                                 type_params: type_params.clone(),
                                 variants: variants.clone(),
                                 span: Span::default(),

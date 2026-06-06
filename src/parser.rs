@@ -190,7 +190,7 @@ impl Parser {
 
     fn expect(&mut self, kind: TokenKind) -> Result<Token, ParseError> {
         let tok = self.current().clone();
-        if std::mem::discriminant(&tok.kind) == std::mem::discriminant(&kind) {
+        if tok.kind == kind {
             self.advance();
             Ok(tok)
         } else {
@@ -707,9 +707,11 @@ impl Parser {
                 if self.skip(TokenKind::Arrow) {
                     let ret = self.parse_type()?;
                     Ok(Type::Function(params, Box::new(ret)))
+                } else if params.len() == 1 {
+                    // Just a parenthesized type
+                    Ok(params.into_iter().next().unwrap())
                 } else {
-                    // Just a parenthesized type (treat as first param)
-                    Ok(params.into_iter().next().unwrap_or(Type::Unit))
+                    Err(self.error("Expected '->' for function type after parenthesized parameter list"))
                 }
             }
             TokenKind::LBrace => {
@@ -1633,7 +1635,7 @@ impl Parser {
                         None
                     };
                     self.expect(TokenKind::Arrow)?;
-                    let body = self.parse_pratt(Precedence::Shift)?;
+                    let body = self.parse_expr()?;
                     arms.push(WhenArm {
                         pattern,
                         guard,
