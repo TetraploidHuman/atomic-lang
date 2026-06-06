@@ -972,8 +972,6 @@ impl<'ctx> CodeGen<'ctx> {
             BinaryOp::Shr => self.bin_bitwise(&left, &right, "shr", |b, l, r| {
                 b.build_right_shift(l, r, false, "shr")
             }),
-            BinaryOp::Is => self.bin_is(lhs, rhs),
-            BinaryOp::In => self.bin_in(lhs, rhs),
             BinaryOp::Range | BinaryOp::RangeExclusive => {
                 let inclusive = matches!(op, BinaryOp::Range);
                 let start_int = match &left {

@@ -1,6 +1,7 @@
 // Submodule: for_loop
 
 use crate::ast::*;
+use inkwell::basic_block::BasicBlock;
 use inkwell::types::BasicTypeEnum;
 use inkwell::values::{IntValue, PointerValue};
 use inkwell::IntPredicate;
@@ -202,7 +203,9 @@ impl<'ctx> CodeGen<'ctx> {
                 body,
                 collect,
             } => self.compile_for_nested_iterate(bindings, body, *collect),
-            _ => Ok(TypedValue::Unit),
+            ForKind::IterateWithIndex { .. } => {
+                Err("for with index is not yet implemented".to_string())
+            }
         }
     }
 
@@ -609,52 +612,59 @@ impl<'ctx> CodeGen<'ctx> {
             None
         };
 
-        // Build nested loop structure: header_0 → body_0 → ... → header_n → body_n → innermost
-        let outer_header = self.context.append_basic_block(current_fn, "nested_h0");
-        let innermost_body = self.context.append_basic_block(current_fn, "nested_inner");
-        let outer_next = self.context.append_basic_block(current_fn, "nested_next");
-        let outer_exit = self.context.append_basic_block(current_fn, "nested_exit");
+        let n = loops.len();
 
-        self.continue_target = Some(outer_next);
-        self.break_target = Some(outer_exit);
+        // Create basic blocks for each loop level
+        let mut headers: Vec<BasicBlock> = Vec::with_capacity(n);
+        let mut nexts: Vec<BasicBlock> = Vec::with_capacity(n);
+        for i in 0..n {
+            headers.push(self.context.append_basic_block(current_fn, &format!("nh{}", i)));
+            nexts.push(self.context.append_basic_block(current_fn, &format!("nn{}", i)));
+        }
+        let innermost_body = self.context.append_basic_block(current_fn, "nested_body");
+        let exit_block = self.context.append_basic_block(current_fn, "nested_exit");
+
+        // continue targets the outermost next block (same semantics as the original 2-binding impl)
+        self.continue_target = Some(nexts[0]);
+        self.break_target = Some(exit_block);
 
         // Branch to first header
-        let _ = self.builder.build_unconditional_branch(outer_header);
+        let _ = self.builder.build_unconditional_branch(headers[0]);
 
-        // ---- Outer loop (level 0) ----
-        self.builder.position_at_end(outer_header);
-        let (outer_idx, _outer_start, outer_end) = loops[0];
-        let outer_val = self
-            .builder
-            .build_load(i64, outer_idx, "o_val")
-            .map_err(llvm_err)?
-            .into_int_value();
-        let outer_cond = self
-            .builder
-            .build_int_compare(IntPredicate::SLT, outer_val, outer_end, "o_cond")
-            .map_err(llvm_err)?;
+        // Build loop structure for each level
+        for i in 0..n {
+            self.builder.position_at_end(headers[i]);
+            let (idx, _start, end) = loops[i];
+            let cur_val = self.builder.build_load(i64, idx, &format!("lv{}", i))
+                .map_err(llvm_err)?.into_int_value();
+            let cond = self.builder.build_int_compare(
+                IntPredicate::SLT, cur_val, end, &format!("lc{}", i)
+            ).map_err(llvm_err)?;
 
-        // ---- Inner loop (level 1) ----
-        let inner_header = self.context.append_basic_block(current_fn, "nested_h1");
-        let inner_next = self.context.append_basic_block(current_fn, "nested_inext");
-        let _ = self
-            .builder
-            .build_conditional_branch(outer_cond, inner_header, outer_exit);
+            // When condition fails, branch to parent's next (or exit for level 0)
+            let fail_target = if i > 0 { nexts[i - 1] } else { exit_block };
 
-        self.builder.position_at_end(inner_header);
-        let (inner_idx, _inner_start, inner_end) = loops[1];
-        let inner_val = self
-            .builder
-            .build_load(i64, inner_idx, "i_val")
-            .map_err(llvm_err)?
-            .into_int_value();
-        let inner_cond = self
-            .builder
-            .build_int_compare(IntPredicate::SLT, inner_val, inner_end, "i_cond")
-            .map_err(llvm_err)?;
-        let _ = self
-            .builder
-            .build_conditional_branch(inner_cond, innermost_body, outer_next);
+            if i < n - 1 {
+                let _ = self.builder.build_conditional_branch(cond, headers[i + 1], fail_target);
+            } else {
+                let _ = self.builder.build_conditional_branch(cond, innermost_body, fail_target);
+            }
+
+            // Build the "next" block for this level
+            // (increment counter, reset inner counters, branch to this level's header)
+            self.builder.position_at_end(nexts[i]);
+            let cur_load = self.builder.build_load(i64, idx, &format!("nl{}", i))
+                .map_err(llvm_err)?.into_int_value();
+            let inc = self.builder.build_int_add(cur_load, i64.const_int(1, false), &format!("ni{}", i))
+                .map_err(llvm_err)?;
+            self.builder.build_store(idx, inc).map_err(llvm_err)?;
+            // Reset all inner loop counters to their start values
+            for j in (i + 1)..n {
+                let (inner_idx, inner_start, _) = loops[j];
+                self.builder.build_store(inner_idx, inner_start).map_err(llvm_err)?;
+            }
+            let _ = self.builder.build_unconditional_branch(headers[i]);
+        }
 
         // ---- Innermost body ----
         self.builder.position_at_end(innermost_body);
@@ -693,48 +703,11 @@ impl<'ctx> CodeGen<'ctx> {
             self.scope = *p;
         }
 
-        // Branch to inner_next
-        let _ = self.builder.build_unconditional_branch(inner_next);
-
-        // ---- Inner next (increment inner counter) ----
-        self.builder.position_at_end(inner_next);
-        let inner_load = self
-            .builder
-            .build_load(i64, inner_idx, "i_load")
-            .map_err(llvm_err)?
-            .into_int_value();
-        let inner_inc = self
-            .builder
-            .build_int_add(inner_load, i64.const_int(1, false), "i_inc")
-            .map_err(llvm_err)?;
-        self.builder
-            .build_store(inner_idx, inner_inc)
-            .map_err(llvm_err)?;
-        let _ = self.builder.build_unconditional_branch(inner_header);
-
-        // ---- Outer next (increment outer counter, reset inner) ----
-        self.builder.position_at_end(outer_next);
-        let outer_load = self
-            .builder
-            .build_load(i64, outer_idx, "o_load")
-            .map_err(llvm_err)?
-            .into_int_value();
-        let outer_inc = self
-            .builder
-            .build_int_add(outer_load, i64.const_int(1, false), "o_inc")
-            .map_err(llvm_err)?;
-        self.builder
-            .build_store(outer_idx, outer_inc)
-            .map_err(llvm_err)?;
-        // Reset inner counter to start value
-        let (inner_idx2_reset, inner_start_reset, _) = loops[1];
-        self.builder
-            .build_store(inner_idx2_reset, inner_start_reset)
-            .map_err(llvm_err)?;
-        let _ = self.builder.build_unconditional_branch(outer_header);
+        // Branch to the innermost next block (increment inner counter)
+        let _ = self.builder.build_unconditional_branch(nexts[n - 1]);
 
         // ---- Exit ----
-        self.builder.position_at_end(outer_exit);
+        self.builder.position_at_end(exit_block);
 
         self.continue_target = saved_continue_target;
         self.break_target = saved_break_target;
