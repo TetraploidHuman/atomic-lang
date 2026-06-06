@@ -1193,6 +1193,23 @@ impl<'ctx> CodeGen<'ctx> {
                 }
             },
             Some(Type::Function(_, _)) => self.ptr_ty().into(),
+            Some(Type::Generic(base, _)) => match base.as_ref() {
+                Type::Named(n) => match n.as_str() {
+                    "List" | "Set" | "Map" => self.list_type.into(),
+                    "Option" | "Result" => {
+                        if let Some(et) = self.enum_types.get(n.as_str()) {
+                            (*et).into()
+                        } else {
+                            self.i64_ty().into()
+                        }
+                    }
+                    "Task" => self.task_type.into(),
+                    "Stream" => self.ptr_ty().into(),
+                    "LazyList" => self.lazylist_type.into(),
+                    _ => self.i64_ty().into(),
+                },
+                _ => self.i64_ty().into(),
+            },
             _ => self.i64_ty().into(),
         }
     }
@@ -1229,6 +1246,24 @@ impl<'ctx> CodeGen<'ctx> {
             Type::Stream(_) => self.ptr_ty().into(),
             Type::LazyList(_) => self.lazylist_type.into(),
             Type::CString | Type::Ptr(_) | Type::FileHandle => self.ptr_ty().into(),
+            Type::Generic(base, _) => match base.as_ref() {
+                Type::Named(n) => match n.as_str() {
+                    "List" => return self.list_type.into(),
+                    "Set" => return self.list_type.into(),
+                    "Map" => return self.list_type.into(),
+                    "Option" | "Result" => {
+                        if let Some(et) = self.enum_types.get(n.as_str()) {
+                            return (*et).into();
+                        }
+                        return self.i64_ty().into();
+                    }
+                    "Task" => return self.task_type.into(),
+                    "Stream" => return self.ptr_ty().into(),
+                    "LazyList" => return self.lazylist_type.into(),
+                    _ => self.i64_ty().into(),
+                },
+                _ => self.i64_ty().into(),
+            },
             _ => self.i64_ty().into(),
         }
     }
@@ -1255,6 +1290,22 @@ impl<'ctx> CodeGen<'ctx> {
             Some(Type::Task(_)) => ValKind::Task,
             Some(Type::Stream(_)) => ValKind::Stream,
             Some(Type::LazyList(_)) => ValKind::LazyList,
+            Some(Type::Generic(base, _)) => match base.as_ref() {
+                Type::Named(n) => match n.as_str() {
+                    "Float" => ValKind::Float,
+                    "Bool" => ValKind::Bool,
+                    "String" | "Str" => ValKind::Str,
+                    "List" => ValKind::List,
+                    "Set" => ValKind::Set,
+                    "Map" => ValKind::Map,
+                    "Option" | "Result" if self.enum_types.contains_key(n.as_str()) => ValKind::Enum,
+                    "Task" => ValKind::Task,
+                    "Stream" => ValKind::Stream,
+                    "LazyList" => ValKind::LazyList,
+                    _ => ValKind::Int,
+                },
+                _ => ValKind::Int,
+            },
             _ => ValKind::Int,
         }
     }

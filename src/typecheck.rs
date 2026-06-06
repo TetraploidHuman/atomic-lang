@@ -913,7 +913,47 @@ impl TypeChecker {
                     _ => Type::Named("Int".into()),
                 }
             }
-            Expr::FieldAccess(_, _) => Type::Named("Int".into()),
+            Expr::FieldAccess(obj, field) => {
+                let obj_type = self.infer_expr_type(obj);
+                if let Type::Named(type_name) = &obj_type {
+                    let struct_name = match type_name.as_str() {
+                        "Str" => "String",
+                        "Double" => "Float",
+                        other => other,
+                    };
+                    if let Some(struct_info) = self.registry.structs.get(struct_name) {
+                        if let Some(index) = struct_info.field_index.get(field) {
+                            return struct_info.fields[*index].1.clone();
+                        }
+                    }
+                }
+                Type::Named("Int".into())
+            }
+            Expr::SafeFieldAccess(obj, field) => {
+                let obj_type = self.infer_expr_type(obj);
+                if let Type::Named(type_name) = &obj_type {
+                    let struct_name = match type_name.as_str() {
+                        "Str" => "String",
+                        "Double" => "Float",
+                        other => other,
+                    };
+                    if let Some(struct_info) = self.registry.structs.get(struct_name) {
+                        if let Some(index) = struct_info.field_index.get(field) {
+                            return struct_info.fields[*index].1.clone();
+                        }
+                    }
+                }
+                Type::Named("Int".into())
+            }
+            Expr::StructLiteral(fields) => {
+                let field_names: Vec<String> = fields.iter().map(|(n, _)| n.clone()).collect();
+                if let Some(struct_info) = self.registry.find_struct_by_fields(&field_names) {
+                    Type::Named(struct_info.name.clone())
+                } else {
+                    Type::Named("Int".into())
+                }
+            }
+            Expr::Assign { value, .. } => self.infer_expr_type(value),
             Expr::Unary(op, inner) => match op {
                 UnaryOp::Not => Type::Named("Bool".into()),
                 UnaryOp::Neg | UnaryOp::BitNot => self.infer_expr_type(inner),
@@ -965,6 +1005,11 @@ impl TypeChecker {
                     .zip(pb.iter())
                     .all(|(a, b)| self.types_compatible(a, b))
                     && self.types_compatible(ra, rb)
+            }
+            (Type::Generic(ba, ta), Type::Generic(bb, tb)) => {
+                ta.len() == tb.len()
+                    && self.types_compatible(ba, bb)
+                    && ta.iter().zip(tb.iter()).all(|(a, b)| self.types_compatible(a, b))
             }
             _ => true,
         }
