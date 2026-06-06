@@ -491,11 +491,35 @@ impl TypeChecker {
                 }
             }
             Expr::For(for_expr) => match &for_expr.kind {
-                ForKind::Iterate { body, .. } => self.collect_expr_errors(body, errors),
-                ForKind::IterateWithIndex { body, .. } => self.collect_expr_errors(body, errors),
-                ForKind::Condition { body, .. } => self.collect_expr_errors(body, errors),
-                ForKind::Infinite { body, .. } => self.collect_expr_errors(body, errors),
-                ForKind::NestedIterate { body, .. } => self.collect_expr_errors(body, errors),
+                ForKind::Iterate {
+                    iterable, body, ..
+                } => {
+                    self.collect_expr_errors(iterable, errors);
+                    self.collect_expr_errors(body, errors);
+                }
+                ForKind::IterateWithIndex {
+                    iterable, body, ..
+                } => {
+                    self.collect_expr_errors(iterable, errors);
+                    self.collect_expr_errors(body, errors);
+                }
+                ForKind::Condition {
+                    condition, body, ..
+                } => {
+                    self.collect_expr_errors(condition, errors);
+                    self.collect_expr_errors(body, errors);
+                }
+                ForKind::Infinite { body, .. } => {
+                    self.collect_expr_errors(body, errors);
+                }
+                ForKind::NestedIterate {
+                    bindings, body, ..
+                } => {
+                    for (_, e) in bindings {
+                        self.collect_expr_errors(e, errors);
+                    }
+                    self.collect_expr_errors(body, errors);
+                }
             },
             Expr::Lambda { body, .. } => {
                 self.collect_expr_errors(body, errors);
@@ -511,6 +535,62 @@ impl TypeChecker {
             }
             Expr::Try(inner) => {
                 self.collect_expr_errors(inner, errors);
+            }
+            Expr::Unary(_, inner) => {
+                self.collect_expr_errors(inner, errors);
+            }
+            Expr::Index(obj, idx) => {
+                self.collect_expr_errors(obj, errors);
+                self.collect_expr_errors(idx, errors);
+            }
+            Expr::Assign {
+                target, value, ..
+            } => {
+                self.collect_expr_errors(target, errors);
+                self.collect_expr_errors(value, errors);
+            }
+            Expr::Tuple(elements) => {
+                for (_, e) in elements {
+                    self.collect_expr_errors(e, errors);
+                }
+            }
+            Expr::SafeFieldAccess(obj, _) => {
+                self.collect_expr_errors(obj, errors);
+            }
+            Expr::SafeCall {
+                receiver, args, ..
+            } => {
+                self.collect_expr_errors(receiver, errors);
+                for a in args {
+                    self.collect_expr_errors(a, errors);
+                }
+            }
+            Expr::Range(start, end) => {
+                self.collect_expr_errors(start, errors);
+                self.collect_expr_errors(end, errors);
+            }
+            Expr::StructLiteral(fields) => {
+                for (_, v) in fields {
+                    self.collect_expr_errors(v, errors);
+                }
+            }
+            Expr::MapLiteral(entries) => {
+                for (k, v) in entries {
+                    self.collect_expr_errors(k, errors);
+                    self.collect_expr_errors(v, errors);
+                }
+            }
+            Expr::SetLiteral(elements) => {
+                for e in elements {
+                    self.collect_expr_errors(e, errors);
+                }
+            }
+            Expr::StringInterpolate(parts) => {
+                for part in parts {
+                    if let StringPart::Expr(e) = part {
+                        self.collect_expr_errors(e, errors);
+                    }
+                }
             }
             _ => {} // Literal, Ident, Continue, Break, etc.
         }

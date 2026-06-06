@@ -637,6 +637,13 @@ impl Lexer {
     fn read_char(&mut self) -> TokenKind {
         // Skip opening quote
         self.advance();
+
+        // Empty char literal: ''
+        if self.current() == Some('\'') {
+            self.advance(); // skip closing quote
+            return TokenKind::Underscore;
+        }
+
         let ch = match self.current() {
             None => return TokenKind::Underscore,
             Some('\\') => {
