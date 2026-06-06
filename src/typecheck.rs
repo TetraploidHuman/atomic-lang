@@ -491,15 +491,11 @@ impl TypeChecker {
                 }
             }
             Expr::For(for_expr) => match &for_expr.kind {
-                ForKind::Iterate {
-                    iterable, body, ..
-                } => {
+                ForKind::Iterate { iterable, body, .. } => {
                     self.collect_expr_errors(iterable, errors);
                     self.collect_expr_errors(body, errors);
                 }
-                ForKind::IterateWithIndex {
-                    iterable, body, ..
-                } => {
+                ForKind::IterateWithIndex { iterable, body, .. } => {
                     self.collect_expr_errors(iterable, errors);
                     self.collect_expr_errors(body, errors);
                 }
@@ -512,9 +508,7 @@ impl TypeChecker {
                 ForKind::Infinite { body, .. } => {
                     self.collect_expr_errors(body, errors);
                 }
-                ForKind::NestedIterate {
-                    bindings, body, ..
-                } => {
+                ForKind::NestedIterate { bindings, body, .. } => {
                     for (_, e) in bindings {
                         self.collect_expr_errors(e, errors);
                     }
@@ -543,9 +537,7 @@ impl TypeChecker {
                 self.collect_expr_errors(obj, errors);
                 self.collect_expr_errors(idx, errors);
             }
-            Expr::Assign {
-                target, value, ..
-            } => {
+            Expr::Assign { target, value, .. } => {
                 self.collect_expr_errors(target, errors);
                 self.collect_expr_errors(value, errors);
             }
@@ -557,9 +549,7 @@ impl TypeChecker {
             Expr::SafeFieldAccess(obj, _) => {
                 self.collect_expr_errors(obj, errors);
             }
-            Expr::SafeCall {
-                receiver, args, ..
-            } => {
+            Expr::SafeCall { receiver, args, .. } => {
                 self.collect_expr_errors(receiver, errors);
                 for a in args {
                     self.collect_expr_errors(a, errors);
