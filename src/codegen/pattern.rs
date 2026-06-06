@@ -407,7 +407,7 @@ impl<'ctx> CodeGen<'ctx> {
                                 .map_err(llvm_err)?;
                             let pat_str = pat_str_agg.into_struct_value();
                             let cc = self
-                                .call_rt("atomic_string_eq", &[str_val.into(), pat_str.into()])?;
+                                .call_rt("action_string_eq", &[str_val.into(), pat_str.into()])?;
                             let eq_result = cc.try_as_basic_value().unwrap_basic().into_int_value();
                             Ok(eq_result)
                         } else {

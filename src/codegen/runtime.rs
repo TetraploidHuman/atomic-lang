@@ -35,19 +35,19 @@ impl<'ctx> CodeGen<'ctx> {
         // Declare RC functions early (defined at end of define_runtime)
         let malloc_rc_fn: inkwell::values::FunctionValue<'ctx> =
             self.module
-                .add_function("atomic_malloc_rc", ptr.fn_type(&[i64.into()], false), None);
+                .add_function("action_malloc_rc", ptr.fn_type(&[i64.into()], false), None);
         let memcmp_fn = self.module.add_function(
             "memcmp",
             i32.fn_type(&[ptr.into(), ptr.into(), i64.into()], false),
             None,
         );
         let utf8_encode_fn = self.module.add_function(
-            "atomic_utf8_encode",
+            "action_utf8_encode",
             i64.fn_type(&[i64.into(), ptr.into()], false),
             None,
         );
         let utf8_byte_len_fn = self.module.add_function(
-            "atomic_utf8_byte_len",
+            "action_utf8_byte_len",
             i64.fn_type(&[i8.into()], false),
             None,
         );
@@ -276,23 +276,23 @@ impl<'ctx> CodeGen<'ctx> {
         );
 
         // ---- HTTP / networking runtime functions ----
-        // atomic_http_request(method: ptr, url: ptr, headers: ptr, body: ptr, body_len: i64) -> ptr
+        // action_http_request(method: ptr, url: ptr, headers: ptr, body: ptr, body_len: i64) -> ptr
         let _http_request_fn = self.module.add_function(
-            "atomic_http_request",
+            "action_http_request",
             ptr.fn_type(
                 &[ptr.into(), ptr.into(), ptr.into(), ptr.into(), i64.into()],
                 false,
             ),
             None,
         );
-        // atomic_http_free(ptr)
+        // action_http_free(ptr)
         let _http_free_fn =
             self.module
-                .add_function("atomic_http_free", void.fn_type(&[ptr.into()], false), None);
-        // atomic_test_ping() -> i64
+                .add_function("action_http_free", void.fn_type(&[ptr.into()], false), None);
+        // action_test_ping() -> i64
         let _ping_fn = self
             .module
-            .add_function("atomic_test_ping", i64.fn_type(&[], false), None);
+            .add_function("action_test_ping", i64.fn_type(&[], false), None);
 
         // Helper to create a global string constant
         let make_global_str = |name: &str, content: &[u8]| -> PointerValue<'ctx> {
@@ -324,10 +324,10 @@ impl<'ctx> CodeGen<'ctx> {
         // Save builder position (might be None since no function has been positioned yet)
         let saved_pos = self.builder.get_insert_block();
 
-        // ---- atomic_print_int(i64) ----
+        // ---- action_print_int(i64) ----
         let print_int_fn =
             self.module
-                .add_function("atomic_print_int", void.fn_type(&[i64.into()], false), None);
+                .add_function("action_print_int", void.fn_type(&[i64.into()], false), None);
         let entry = self.context.append_basic_block(print_int_fn, "entry");
         self.builder.position_at_end(entry);
         let n = print_int_fn.get_first_param().unwrap();
@@ -336,9 +336,9 @@ impl<'ctx> CodeGen<'ctx> {
             .build_call(printf_fn, &[fmt_int_ptr.into(), n.into()], "");
         let _ = self.builder.build_return(None);
 
-        // ---- atomic_print_float(double) ----
+        // ---- action_print_float(double) ----
         let print_float_fn = self.module.add_function(
-            "atomic_print_float",
+            "action_print_float",
             void.fn_type(&[f64.into()], false),
             None,
         );
@@ -350,10 +350,10 @@ impl<'ctx> CodeGen<'ctx> {
             .build_call(printf_fn, &[fmt_float_ptr.into(), n.into()], "");
         let _ = self.builder.build_return(None);
 
-        // ---- atomic_print_bool(i1) ----
+        // ---- action_print_bool(i1) ----
         let print_bool_fn =
             self.module
-                .add_function("atomic_print_bool", void.fn_type(&[b1.into()], false), None);
+                .add_function("action_print_bool", void.fn_type(&[b1.into()], false), None);
         let entry = self.context.append_basic_block(print_bool_fn, "entry");
         let true_block = self
             .context
@@ -377,10 +377,10 @@ impl<'ctx> CodeGen<'ctx> {
             .build_call(printf_fn, &[fmt_str_ptr.into(), str_false_ptr.into()], "");
         let _ = self.builder.build_return(None);
 
-        // ---- atomic_print_string({i64, ptr}) ----
+        // ---- action_print_string({i64, ptr}) ----
         // Handles both: String (non-null data ptr) and Int (null data ptr, value in tag)
         let print_str_fn = self.module.add_function(
-            "atomic_print_string",
+            "action_print_string",
             void.fn_type(&[str_ty.into()], false),
             None,
         );
@@ -417,18 +417,18 @@ impl<'ctx> CodeGen<'ctx> {
             .build_call(printf_fn, &[fmt_int_ptr.into(), tag.into()], "");
         let _ = self.builder.build_return(None);
 
-        // ---- atomic_println() ----
+        // ---- action_println() ----
         let println_fn = self
             .module
-            .add_function("atomic_println", void.fn_type(&[], false), None);
+            .add_function("action_println", void.fn_type(&[], false), None);
         let entry = self.context.append_basic_block(println_fn, "entry");
         self.builder.position_at_end(entry);
         let _ = self.builder.build_call(printf_fn, &[fmt_nl_ptr.into()], "");
         let _ = self.builder.build_return(None);
 
-        // ---- atomic_list_print({ptr, i64, i64}) ----
+        // ---- action_list_print({ptr, i64, i64}) ----
         let list_print_fn = self.module.add_function(
-            "atomic_list_print",
+            "action_list_print",
             void.fn_type(&[self.list_type.into()], false),
             None,
         );
@@ -516,9 +516,9 @@ impl<'ctx> CodeGen<'ctx> {
         let _ = self.builder.build_call(printf_fn, &[fmt_rb_ptr.into()], "");
         let _ = self.builder.build_return(None);
 
-        // ---- atomic_print_task({pthread: i64, done: i64, cancelled: i64, result_list: list_type}) ----
+        // ---- action_print_task({pthread: i64, done: i64, cancelled: i64, result_list: list_type}) ----
         let task_print_fn = self.module.add_function(
-            "atomic_print_task",
+            "action_print_task",
             void.fn_type(&[self.task_type.into()], false),
             None,
         );
@@ -550,10 +550,10 @@ impl<'ctx> CodeGen<'ctx> {
             .build_call(printf_fn, &[fmt_task_suf_ptr.into()], "");
         let _ = self.builder.build_return(None);
 
-        // ---- atomic_print_struct() ----
+        // ---- action_print_struct() ----
         let struct_print_fn =
             self.module
-                .add_function("atomic_print_struct", void.fn_type(&[], false), None);
+                .add_function("action_print_struct", void.fn_type(&[], false), None);
         let sp_entry = self.context.append_basic_block(struct_print_fn, "entry");
         self.builder.position_at_end(sp_entry);
         let _ = self
@@ -561,10 +561,10 @@ impl<'ctx> CodeGen<'ctx> {
             .build_call(printf_fn, &[fmt_struct_ptr.into()], "");
         let _ = self.builder.build_return(None);
 
-        // ---- atomic_print_enum({i64, ptr}) ----
+        // ---- action_print_enum({i64, ptr}) ----
         let enum_ty = self.context.struct_type(&[i64.into(), ptr.into()], false);
         let enum_print_fn = self.module.add_function(
-            "atomic_print_enum",
+            "action_print_enum",
             void.fn_type(&[enum_ty.into()], false),
             None,
         );
@@ -623,10 +623,10 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(ep_merge_bb);
         let _ = self.builder.build_return(None);
 
-        // ---- atomic_print_enum_float({i64, ptr}) ----
-        // Same as atomic_print_enum but loads f64 from the heap instead of i64
+        // ---- action_print_enum_float({i64, ptr}) ----
+        // Same as action_print_enum but loads f64 from the heap instead of i64
         let epf_fn = self.module.add_function(
-            "atomic_print_enum_float",
+            "action_print_enum_float",
             void.fn_type(&[enum_ty.into()], false),
             None,
         );
@@ -685,9 +685,9 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(epf_merge_bb);
         let _ = self.builder.build_return(None);
 
-        // ---- atomic_string_create(ptr, i64) -> {i64, ptr} ----
+        // ---- action_string_create(ptr, i64) -> {i64, ptr} ----
         let str_create_fn = self.module.add_function(
-            "atomic_string_create",
+            "action_string_create",
             str_ty.fn_type(&[ptr.into(), i64.into()], false),
             None,
         );
@@ -737,9 +737,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&r2));
 
-        // ---- atomic_string_concat({i64, ptr}, {i64, ptr}) -> {i64, ptr} ----
+        // ---- action_string_concat({i64, ptr}, {i64, ptr}) -> {i64, ptr} ----
         let str_concat_fn = self.module.add_function(
-            "atomic_string_concat",
+            "action_string_concat",
             str_ty.fn_type(&[str_ty.into(), str_ty.into()], false),
             None,
         );
@@ -815,9 +815,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&r2));
 
-        // ---- atomic_string_eq({i64, ptr}, {i64, ptr}) -> i1 ----
+        // ---- action_string_eq({i64, ptr}, {i64, ptr}) -> i1 ----
         let str_eq_fn = self.module.add_function(
-            "atomic_string_eq",
+            "action_string_eq",
             b1.fn_type(&[str_ty.into(), str_ty.into()], false),
             None,
         );
@@ -920,9 +920,9 @@ impl<'ctx> CodeGen<'ctx> {
         ]);
         let _ = self.builder.build_return(Some(&phi.as_basic_value()));
 
-        // ---- atomic_string_len({i64, ptr}) -> i64 ----
+        // ---- action_string_len({i64, ptr}) -> i64 ----
         let str_len_fn = self.module.add_function(
-            "atomic_string_len",
+            "action_string_len",
             i64.fn_type(&[str_ty.into()], false),
             None,
         );
@@ -936,9 +936,9 @@ impl<'ctx> CodeGen<'ctx> {
             .into_int_value();
         let _ = self.builder.build_return(Some(&sl_len));
 
-        // ---- atomic_int_to_string(i64) -> {i64, ptr} ----
+        // ---- action_int_to_string(i64) -> {i64, ptr} ----
         let int_to_str_fn = self.module.add_function(
-            "atomic_int_to_string",
+            "action_int_to_string",
             str_ty.fn_type(&[i64.into()], false),
             None,
         );
@@ -980,9 +980,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&r2));
 
-        // ---- atomic_float_to_string(f64) -> {i64, ptr} ----
+        // ---- action_float_to_string(f64) -> {i64, ptr} ----
         let float_to_str_fn = self.module.add_function(
-            "atomic_float_to_string",
+            "action_float_to_string",
             str_ty.fn_type(&[f64.into()], false),
             None,
         );
@@ -1023,9 +1023,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&r2));
 
-        // ---- atomic_int_pow(i64, i64) -> i64 (exponentiation by squaring) ----
+        // ---- action_int_pow(i64, i64) -> i64 (exponentiation by squaring) ----
         let int_pow_fn = self.module.add_function(
-            "atomic_int_pow",
+            "action_int_pow",
             i64.fn_type(&[i64.into(), i64.into()], false),
             None,
         );
@@ -1150,7 +1150,7 @@ impl<'ctx> CodeGen<'ctx> {
         let _ = self.builder.build_return(Some(&done_val));
         let list_ty = self.list_type;
         let list_create_fn = self.module.add_function(
-            "atomic_list_create",
+            "action_list_create",
             list_ty.fn_type(&[i64.into()], false),
             None,
         );
@@ -1186,9 +1186,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&r3));
 
-        // ---- atomic_list_push({ptr, i64, i64}, {i64, ptr}) -> {ptr, i64, i64} ----
+        // ---- action_list_push({ptr, i64, i64}, {i64, ptr}) -> {ptr, i64, i64} ----
         let list_push_fn = self.module.add_function(
-            "atomic_list_push",
+            "action_list_push",
             list_ty.fn_type(&[list_ty.into(), self.string_type.into()], false),
             None,
         );
@@ -1327,9 +1327,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&r3));
 
-        // ---- atomic_list_get({ptr, i64, i64}, i64) -> {i64, ptr} ----
+        // ---- action_list_get({ptr, i64, i64}, i64) -> {i64, ptr} ----
         let list_get_fn = self.module.add_function(
-            "atomic_list_get",
+            "action_list_get",
             self.string_type
                 .fn_type(&[list_ty.into(), i64.into()], false),
             None,
@@ -1362,9 +1362,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&val));
 
-        // ---- atomic_list_head({ptr, i64, i64}) -> {i64, ptr} ----
+        // ---- action_list_head({ptr, i64, i64}) -> {i64, ptr} ----
         let list_head_fn = self.module.add_function(
-            "atomic_list_head",
+            "action_list_head",
             self.string_type.fn_type(&[list_ty.into()], false),
             None,
         );
@@ -1420,9 +1420,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&lh_val));
 
-        // ---- atomic_list_len({ptr, i64, i64}) -> i64 ----
+        // ---- action_list_len({ptr, i64, i64}) -> i64 ----
         let list_len_fn = self.module.add_function(
-            "atomic_list_len",
+            "action_list_len",
             i64.fn_type(&[list_ty.into()], false),
             None,
         );
@@ -1436,9 +1436,9 @@ impl<'ctx> CodeGen<'ctx> {
             .into_int_value();
         let _ = self.builder.build_return(Some(&len));
 
-        // ---- atomic_list_contains({ptr, i64, i64}, {i64, ptr}) -> i1 ----
+        // ---- action_list_contains({ptr, i64, i64}, {i64, ptr}) -> i1 ----
         let lc_fn = self.module.add_function(
-            "atomic_list_contains",
+            "action_list_contains",
             b1.fn_type(&[list_ty.into(), self.string_type.into()], false),
             None,
         );
@@ -1548,7 +1548,7 @@ impl<'ctx> CodeGen<'ctx> {
         // Compare string content
         self.builder.position_at_end(lc_str_check_bb);
         let str_eq_call = self.call_rt(
-            "atomic_string_eq",
+            "action_string_eq",
             &[
                 lc_elem_ss.as_basic_value_enum().into(),
                 lc_key.as_basic_value_enum().into(),
@@ -1591,9 +1591,9 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(lc_done_bb);
         let _ = self.builder.build_return(Some(&b1.const_int(0, false)));
 
-        // ---- atomic_list_reverse({ptr, i64, i64}) -> {ptr, i64, i64} ----
+        // ---- action_list_reverse({ptr, i64, i64}) -> {ptr, i64, i64} ----
         let lr_fn = self.module.add_function(
-            "atomic_list_reverse",
+            "action_list_reverse",
             list_ty.fn_type(&[list_ty.into()], false),
             None,
         );
@@ -1700,9 +1700,9 @@ impl<'ctx> CodeGen<'ctx> {
         lr_final.add_incoming(&[(&lr_new2, lr_next_block)]);
         let _ = self.builder.build_return(Some(&lr_final.as_basic_value()));
 
-        // ---- atomic_list_range(i64, i64) -> {ptr, i64, i64} ----
+        // ---- action_list_range(i64, i64) -> {ptr, i64, i64} ----
         let range_fn = self.module.add_function(
-            "atomic_list_range",
+            "action_list_range",
             list_ty.fn_type(&[i64.into(), i64.into()], false),
             None,
         );
@@ -1795,9 +1795,9 @@ impl<'ctx> CodeGen<'ctx> {
         rg_final.add_incoming(&[(&rg_list, rg_entry), (&rg_list3, rg_next_block)]);
         let _ = self.builder.build_return(Some(&rg_final.as_basic_value()));
 
-        // ---- atomic_list_take({ptr, i64, i64}, i64) -> {ptr, i64, i64} ----
+        // ---- action_list_take({ptr, i64, i64}, i64) -> {ptr, i64, i64} ----
         let lt_fn = self.module.add_function(
-            "atomic_list_take",
+            "action_list_take",
             list_ty.fn_type(&[list_ty.into(), i64.into()], false),
             None,
         );
@@ -1901,9 +1901,9 @@ impl<'ctx> CodeGen<'ctx> {
         lt_final.add_incoming(&[(&lt_cur2, lt_next_block)]);
         let _ = self.builder.build_return(Some(&lt_final.as_basic_value()));
 
-        // ---- atomic_list_drop({ptr, i64, i64}, i64) -> {ptr, i64, i64} ----
+        // ---- action_list_drop({ptr, i64, i64}, i64) -> {ptr, i64, i64} ----
         let ld_fn = self.module.add_function(
-            "atomic_list_drop",
+            "action_list_drop",
             list_ty.fn_type(&[list_ty.into(), i64.into()], false),
             None,
         );
@@ -2072,9 +2072,9 @@ impl<'ctx> CodeGen<'ctx> {
             .builder
             .build_return(Some(&max_result.into_int_value()));
 
-        // ---- atomic_string_to_upper({i64, ptr}) -> {i64, ptr} ----
+        // ---- action_string_to_upper({i64, ptr}) -> {i64, ptr} ----
         let to_upper_fn = self.module.add_function(
-            "atomic_string_to_upper",
+            "action_string_to_upper",
             str_ty.fn_type(&[str_ty.into()], false),
             None,
         );
@@ -2200,9 +2200,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&r2));
 
-        // ---- atomic_string_to_lower({i64, ptr}) -> {i64, ptr} ----
+        // ---- action_string_to_lower({i64, ptr}) -> {i64, ptr} ----
         let to_lower_fn = self.module.add_function(
-            "atomic_string_to_lower",
+            "action_string_to_lower",
             str_ty.fn_type(&[str_ty.into()], false),
             None,
         );
@@ -2327,9 +2327,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&r2));
 
-        // ---- atomic_string_trim({i64, ptr}) -> {i64, ptr} ----
+        // ---- action_string_trim({i64, ptr}) -> {i64, ptr} ----
         let trim_fn = self.module.add_function(
-            "atomic_string_trim",
+            "action_string_trim",
             str_ty.fn_type(&[str_ty.into()], false),
             None,
         );
@@ -2565,10 +2565,10 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&r2));
 
-        // ---- atomic_map_create(i64 capacity) -> {ptr, i64, i64} ----
+        // ---- action_map_create(i64 capacity) -> {ptr, i64, i64} ----
         // Same layout as list but 32 bytes per entry (4 * i64 for key+val fat structs)
         let map_create_fn = self.module.add_function(
-            "atomic_map_create",
+            "action_map_create",
             list_ty.fn_type(&[i64.into()], false),
             None,
         );
@@ -2603,14 +2603,14 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&r3));
 
-        // ---- atomic_map_insert / atomic_map_get / atomic_map_contains ----
+        // ---- action_map_insert / action_map_get / action_map_contains ----
         // These are implemented as simple linear-search functions.
         // For simplicity, all three are thin wrappers over a shared pattern:
         // iterate entries, compare fat-struct keys, then either update/get/check.
 
-        // atomic_map_insert({ptr,i64,i64}, {i64,ptr}, {i64,ptr}) -> {ptr,i64,i64}
+        // action_map_insert({ptr,i64,i64}, {i64,ptr}, {i64,ptr}) -> {ptr,i64,i64}
         let mi_fn = self.module.add_function(
-            "atomic_map_insert",
+            "action_map_insert",
             list_ty.fn_type(&[list_ty.into(), str_ty.into(), str_ty.into()], false),
             None,
         );
@@ -2734,7 +2734,7 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?
             .into_int_value();
         // If key ptr is 0 (value type), tag match is enough.
-        // Otherwise use atomic_string_eq for proper content comparison (handles strings, enums, structs).
+        // Otherwise use action_string_eq for proper content comparison (handles strings, enums, structs).
         let mi_kpz = self
             .builder
             .build_int_compare(IntPredicate::EQ, mi_kp_i64, zero, "kpz")
@@ -2753,7 +2753,7 @@ impl<'ctx> CodeGen<'ctx> {
             .builder
             .build_insert_value(mi_ek1, mi_ep_ptr, 1, "ek2")
             .map_err(llvm_err)?;
-        let seq_fn = self.module.get_function("atomic_string_eq").unwrap();
+        let seq_fn = self.module.get_function("action_string_eq").unwrap();
         let mi_seq = self
             .builder
             .build_call(
@@ -2974,9 +2974,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&mi_rr3));
 
-        // atomic_map_get({ptr,i64,i64}, {i64,ptr}) -> {i64,ptr}
+        // action_map_get({ptr,i64,i64}, {i64,ptr}) -> {i64,ptr}
         let mg_fn = self.module.add_function(
-            "atomic_map_get",
+            "action_map_get",
             str_ty.fn_type(&[list_ty.into(), str_ty.into()], false),
             None,
         );
@@ -3087,7 +3087,7 @@ impl<'ctx> CodeGen<'ctx> {
             .builder
             .build_insert_value(mg_ek1, mg_ep_ptr, 1, "ek2")
             .map_err(llvm_err)?;
-        let seq_fn2 = self.module.get_function("atomic_string_eq").unwrap();
+        let seq_fn2 = self.module.get_function("action_string_eq").unwrap();
         let mg_seq = self
             .builder
             .build_call(
@@ -3171,9 +3171,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&mg_nf2));
 
-        // atomic_map_contains({ptr,i64,i64}, {i64,ptr}) -> i1
+        // action_map_contains({ptr,i64,i64}, {i64,ptr}) -> i1
         let mc_fn = self.module.add_function(
-            "atomic_map_contains",
+            "action_map_contains",
             b1.fn_type(&[list_ty.into(), str_ty.into()], false),
             None,
         );
@@ -3284,7 +3284,7 @@ impl<'ctx> CodeGen<'ctx> {
             .builder
             .build_insert_value(mc_ek1, mc_ep_ptr, 1, "ek2")
             .map_err(llvm_err)?;
-        let seq_fn3 = self.module.get_function("atomic_string_eq").unwrap();
+        let seq_fn3 = self.module.get_function("action_string_eq").unwrap();
         let mc_seq = self
             .builder
             .build_call(
@@ -3318,9 +3318,9 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(mc_blocks[6]); // not_found
         let _ = self.builder.build_return(Some(&b1.const_int(0, false)));
 
-        // ---- atomic_map_remove({ptr,i64,i64}, {i64,ptr}) -> {ptr,i64,i64} ----
+        // ---- action_map_remove({ptr,i64,i64}, {i64,ptr}) -> {ptr,i64,i64} ----
         let mr_fn = self.module.add_function(
-            "atomic_map_remove",
+            "action_map_remove",
             list_ty.fn_type(&[list_ty.into(), str_ty.into()], false),
             None,
         );
@@ -3436,7 +3436,7 @@ impl<'ctx> CodeGen<'ctx> {
             .builder
             .build_insert_value(mr_ek1, mr_ep_ptr, 1, "ek2")
             .map_err(llvm_err)?;
-        let seq_fn4 = self.module.get_function("atomic_string_eq").unwrap();
+        let seq_fn4 = self.module.get_function("action_string_eq").unwrap();
         let mr_seq = self
             .builder
             .build_call(
@@ -3545,9 +3545,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&mr_r3));
 
-        // ---- atomic_string_starts_with({i64, ptr}, {i64, ptr}) -> i1 ----
+        // ---- action_string_starts_with({i64, ptr}, {i64, ptr}) -> i1 ----
         let sw_fn = self.module.add_function(
-            "atomic_string_starts_with",
+            "action_string_starts_with",
             self.bool_ty()
                 .fn_type(&[str_ty.into(), str_ty.into()], false),
             None,
@@ -3628,9 +3628,9 @@ impl<'ctx> CodeGen<'ctx> {
         ]);
         let _ = self.builder.build_return(Some(&sw_phi.as_basic_value()));
 
-        // ---- atomic_string_ends_with({i64, ptr}, {i64, ptr}) -> i1 ----
+        // ---- action_string_ends_with({i64, ptr}, {i64, ptr}) -> i1 ----
         let ew_fn = self.module.add_function(
-            "atomic_string_ends_with",
+            "action_string_ends_with",
             self.bool_ty()
                 .fn_type(&[str_ty.into(), str_ty.into()], false),
             None,
@@ -3720,9 +3720,9 @@ impl<'ctx> CodeGen<'ctx> {
         ]);
         let _ = self.builder.build_return(Some(&ew_phi.as_basic_value()));
 
-        // ---- atomic_string_substring({i64, ptr}, i64 start, i64 len) -> {i64, ptr} ----
+        // ---- action_string_substring({i64, ptr}, i64 start, i64 len) -> {i64, ptr} ----
         let sub_fn = self.module.add_function(
-            "atomic_string_substring",
+            "action_string_substring",
             str_ty.fn_type(&[str_ty.into(), i64.into(), i64.into()], false),
             None,
         );
@@ -3821,12 +3821,12 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&sub_r2));
 
-        // ---- atomic_parse_int({i64, ptr}) -> {i64, i1} (value, success) ----
+        // ---- action_parse_int({i64, ptr}) -> {i64, i1} (value, success) ----
         let pi_ret_ty = self
             .context
             .struct_type(&[i64.into(), self.bool_ty().into()], false);
         let pi_fn = self.module.add_function(
-            "atomic_parse_int",
+            "action_parse_int",
             pi_ret_ty.fn_type(&[str_ty.into()], false),
             None,
         );
@@ -4052,9 +4052,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&pi_ret2));
 
-        // ---- atomic_read_file({i64, ptr}) -> {i64, ptr} ----
+        // ---- action_read_file({i64, ptr}) -> {i64, ptr} ----
         let rf_fn = self.module.add_function(
-            "atomic_read_file",
+            "action_read_file",
             str_ty.fn_type(&[str_ty.into()], false),
             None,
         );
@@ -4194,9 +4194,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&rf_r2));
 
-        // ---- atomic_write_file({i64, ptr}, {i64, ptr}) -> i1 ----
+        // ---- action_write_file({i64, ptr}, {i64, ptr}) -> i1 ----
         let wf_fn = self.module.add_function(
-            "atomic_write_file",
+            "action_write_file",
             self.bool_ty()
                 .fn_type(&[str_ty.into(), str_ty.into()], false),
             None,
@@ -4277,9 +4277,9 @@ impl<'ctx> CodeGen<'ctx> {
         ]);
         let _ = self.builder.build_return(Some(&wf_phi.as_basic_value()));
 
-        // ---- atomic_file_exists({i64, ptr}) -> i1 ----
+        // ---- action_file_exists({i64, ptr}) -> i1 ----
         let fe_fn = self.module.add_function(
-            "atomic_file_exists",
+            "action_file_exists",
             self.bool_ty().fn_type(&[str_ty.into()], false),
             None,
         );
@@ -4332,9 +4332,9 @@ impl<'ctx> CodeGen<'ctx> {
         ]);
         let _ = self.builder.build_return(Some(&fe_phi.as_basic_value()));
 
-        // ---- atomic_file_append({i64, ptr}, {i64, ptr}) -> i1 ----
+        // ---- action_file_append({i64, ptr}, {i64, ptr}) -> i1 ----
         let fa_fn = self.module.add_function(
-            "atomic_file_append",
+            "action_file_append",
             self.bool_ty()
                 .fn_type(&[str_ty.into(), str_ty.into()], false),
             None,
@@ -4415,9 +4415,9 @@ impl<'ctx> CodeGen<'ctx> {
         ]);
         let _ = self.builder.build_return(Some(&fa_phi.as_basic_value()));
 
-        // ---- atomic_file_delete({i64, ptr}) -> i1 ----
+        // ---- action_file_delete({i64, ptr}) -> i1 ----
         let fd_fn = self.module.add_function(
-            "atomic_file_delete",
+            "action_file_delete",
             self.bool_ty().fn_type(&[str_ty.into()], false),
             None,
         );
@@ -4450,10 +4450,10 @@ impl<'ctx> CodeGen<'ctx> {
 
         // ---- Streaming File I/O Runtime Functions ----
 
-        // ---- atomic_file_open({i64, ptr}, {i64, ptr}) -> ptr (FILE*) ----
+        // ---- action_file_open({i64, ptr}, {i64, ptr}) -> ptr (FILE*) ----
         // Opens a file at path with mode. Returns FILE* (null on failure).
         let fo_fn = self.module.add_function(
-            "atomic_file_open",
+            "action_file_open",
             ptr.fn_type(&[str_ty.into(), str_ty.into()], false),
             None,
         );
@@ -4480,11 +4480,11 @@ impl<'ctx> CodeGen<'ctx> {
             .into_pointer_value();
         let _ = self.builder.build_return(Some(&fo_file));
 
-        // ---- atomic_file_close(ptr) -> i32 ----
+        // ---- action_file_close(ptr) -> i32 ----
         // Closes a file handle. Returns 0 on success, EOF on failure.
         let fc_fn =
             self.module
-                .add_function("atomic_file_close", i32.fn_type(&[ptr.into()], false), None);
+                .add_function("action_file_close", i32.fn_type(&[ptr.into()], false), None);
         let entry = self.context.append_basic_block(fc_fn, "entry");
         self.builder.position_at_end(entry);
         let fc_handle = fc_fn.get_first_param().unwrap().into_pointer_value();
@@ -4497,13 +4497,13 @@ impl<'ctx> CodeGen<'ctx> {
             .into_int_value();
         let _ = self.builder.build_return(Some(&fc_ret));
 
-        // ---- atomic_file_eof(ptr) -> i1 ----
+        // ---- action_file_eof(ptr) -> i1 ----
         // Checks if file handle is at EOF. Uses feof().
         let feof_c_fn = self
             .module
             .add_function("feof", i32.fn_type(&[ptr.into()], false), None);
         let fe_fn = self.module.add_function(
-            "atomic_file_eof",
+            "action_file_eof",
             self.bool_ty().fn_type(&[ptr.into()], false),
             None,
         );
@@ -4523,14 +4523,14 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&fe_ok));
 
-        // ---- atomic_file_read_line(ptr) -> {i64, ptr, i1} (len, data, success) ----
+        // ---- action_file_read_line(ptr) -> {i64, ptr, i1} (len, data, success) ----
         // Reads one line from file handle. Returns string + success flag (0 on EOF).
         // Uses fgets with a 4096-byte buffer.
         let frl_ret_ty = self
             .context
             .struct_type(&[i64.into(), ptr.into(), self.bool_ty().into()], false);
         let frl_fn = self.module.add_function(
-            "atomic_file_read_line",
+            "action_file_read_line",
             frl_ret_ty.fn_type(&[ptr.into()], false),
             None,
         );
@@ -4647,11 +4647,11 @@ impl<'ctx> CodeGen<'ctx> {
         frl_phi.add_incoming(&[(&frl_e3, frl_eof_bb), (&frl_o3, frl_ok_bb)]);
         let _ = self.builder.build_return(Some(&frl_phi.as_basic_value()));
 
-        // ---- atomic_file_read_bytes(ptr, i64) -> {i64, ptr} (actual_len, data) ----
+        // ---- action_file_read_bytes(ptr, i64) -> {i64, ptr} (actual_len, data) ----
         // Reads up to size bytes from file handle. Returns 0 length on EOF.
         let frb_ret_ty = self.context.struct_type(&[i64.into(), ptr.into()], false);
         let frb_fn = self.module.add_function(
-            "atomic_file_read_bytes",
+            "action_file_read_bytes",
             frb_ret_ty.fn_type(&[ptr.into(), i64.into()], false),
             None,
         );
@@ -4693,10 +4693,10 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&frb_r2));
 
-        // ---- atomic_file_write_bytes(ptr, ptr, i64) -> i1 ----
+        // ---- action_file_write_bytes(ptr, ptr, i64) -> i1 ----
         // Writes data_len bytes from data to file. Returns true on success.
         let fwb_fn = self.module.add_function(
-            "atomic_file_write_bytes",
+            "action_file_write_bytes",
             self.bool_ty()
                 .fn_type(&[ptr.into(), ptr.into(), i64.into()], false),
             None,
@@ -4728,10 +4728,10 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&fwb_ok));
 
-        // ---- atomic_file_seek(ptr, i64, i32) -> i1 ----
+        // ---- action_file_seek(ptr, i64, i32) -> i1 ----
         // Seeks to position (offset from whence: 0=SET, 1=CUR, 2=END). Returns true on success.
         let fs_fn = self.module.add_function(
-            "atomic_file_seek",
+            "action_file_seek",
             self.bool_ty()
                 .fn_type(&[ptr.into(), i64.into(), i32.into()], false),
             None,
@@ -4758,11 +4758,11 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&fs_ok));
 
-        // ---- atomic_file_tell(ptr) -> i64 ----
+        // ---- action_file_tell(ptr) -> i64 ----
         // Returns current file position.
         let ft_fn =
             self.module
-                .add_function("atomic_file_tell", i64.fn_type(&[ptr.into()], false), None);
+                .add_function("action_file_tell", i64.fn_type(&[ptr.into()], false), None);
         let entry = self.context.append_basic_block(ft_fn, "entry");
         self.builder.position_at_end(entry);
         let ft_handle = ft_fn.get_first_param().unwrap().into_pointer_value();
@@ -4775,13 +4775,13 @@ impl<'ctx> CodeGen<'ctx> {
             .into_int_value();
         let _ = self.builder.build_return(Some(&ft_ret));
 
-        // ---- atomic_file_flush(ptr) -> i1 ----
+        // ---- action_file_flush(ptr) -> i1 ----
         // Flushes file handle. Returns true on success.
         let fflush_fn = self
             .module
             .add_function("fflush", i32.fn_type(&[ptr.into()], false), None);
         let ff_fn = self.module.add_function(
-            "atomic_file_flush",
+            "action_file_flush",
             self.bool_ty().fn_type(&[ptr.into()], false),
             None,
         );
@@ -4801,14 +4801,14 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&ff_ok));
 
-        // ---- atomic_rand_init() ----
+        // ---- action_rand_init() ----
         // Simple LCG state: uses a global i64 seed initialized to 1
-        let rand_seed_g = self.module.add_global(i64, None, "atomic_rand_seed");
+        let rand_seed_g = self.module.add_global(i64, None, "action_rand_seed");
         rand_seed_g.set_initializer(&i64.const_int(123456789, false));
 
-        // ---- atomic_rand_int(i64 min, i64 max) -> i64 ----
+        // ---- action_rand_int(i64 min, i64 max) -> i64 ----
         let ri_fn = self.module.add_function(
-            "atomic_rand_int",
+            "action_rand_int",
             i64.fn_type(&[i64.into(), i64.into()], false),
             None,
         );
@@ -4877,10 +4877,10 @@ impl<'ctx> CodeGen<'ctx> {
             .into_int_value();
         let _ = self.builder.build_return(Some(&ri_result));
 
-        // ---- atomic_rand_float() -> f64 ----
+        // ---- action_rand_float() -> f64 ----
         let rf_fn = self
             .module
-            .add_function("atomic_rand_float", f64.fn_type(&[], false), None);
+            .add_function("action_rand_float", f64.fn_type(&[], false), None);
         let entry = self.context.append_basic_block(rf_fn, "entry");
         self.builder.position_at_end(entry);
         // Use the same LCG seed, return value in [0, 1)
@@ -4918,10 +4918,10 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&rf_result));
 
-        // ---- atomic_string_split({i64, ptr}, {i64, ptr}) -> {ptr, i64, i64} ----
+        // ---- action_string_split({i64, ptr}, {i64, ptr}) -> {ptr, i64, i64} ----
         // Returns a list of strings by splitting the input on delimiter occurrences.
         let sp_fn = self.module.add_function(
-            "atomic_string_split",
+            "action_string_split",
             list_ty.fn_type(&[str_ty.into(), str_ty.into()], false),
             None,
         );
@@ -5468,9 +5468,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&sp_result));
 
-        // ---- atomic_string_join({ptr, i64, i64}, {i64, ptr}) -> {i64, ptr} ----
+        // ---- action_string_join({ptr, i64, i64}, {i64, ptr}) -> {i64, ptr} ----
         let jn_fn = self.module.add_function(
-            "atomic_string_join",
+            "action_string_join",
             str_ty.fn_type(&[list_ty.into(), str_ty.into()], false),
             None,
         );
@@ -5785,9 +5785,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&jn_r2));
 
-        // ---- atomic_string_replace({i64, ptr}, {i64, ptr}, {i64, ptr}) -> {i64, ptr} ----
+        // ---- action_string_replace({i64, ptr}, {i64, ptr}, {i64, ptr}) -> {i64, ptr} ----
         let rp_fn = self.module.add_function(
-            "atomic_string_replace",
+            "action_string_replace",
             str_ty.fn_type(&[str_ty.into(), str_ty.into(), str_ty.into()], false),
             None,
         );
@@ -6206,9 +6206,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&rp_rr2));
 
-        // ---- atomic_string_contains({i64, ptr}, {i64, ptr}) -> i1 ----
+        // ---- action_string_contains({i64, ptr}, {i64, ptr}) -> i1 ----
         let sc_fn = self.module.add_function(
-            "atomic_string_contains",
+            "action_string_contains",
             b1.fn_type(&[str_ty.into(), str_ty.into()], false),
             None,
         );
@@ -6352,9 +6352,9 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(sc_notfound_bb);
         let _ = self.builder.build_return(Some(&b1.const_int(0, false)));
 
-        // ---- atomic_string_repeat({i64, ptr}, i64) -> {i64, ptr} ----
+        // ---- action_string_repeat({i64, ptr}, i64) -> {i64, ptr} ----
         let sr_fn = self.module.add_function(
-            "atomic_string_repeat",
+            "action_string_repeat",
             str_ty.fn_type(&[str_ty.into(), i64.into()], false),
             None,
         );
@@ -6439,9 +6439,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&sr_r2));
 
-        // ---- atomic_string_trim_start({i64, ptr}) -> {i64, ptr} ----
+        // ---- action_string_trim_start({i64, ptr}) -> {i64, ptr} ----
         let ts_fn = self.module.add_function(
-            "atomic_string_trim_start",
+            "action_string_trim_start",
             str_ty.fn_type(&[str_ty.into()], false),
             None,
         );
@@ -6568,9 +6568,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&ts_r2));
 
-        // ---- atomic_string_trim_end({i64, ptr}) -> {i64, ptr} ----
+        // ---- action_string_trim_end({i64, ptr}) -> {i64, ptr} ----
         let te_fn = self.module.add_function(
-            "atomic_string_trim_end",
+            "action_string_trim_end",
             str_ty.fn_type(&[str_ty.into()], false),
             None,
         );
@@ -6746,10 +6746,10 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&te_r2));
 
-        // ---- atomic_list_tail({ptr, i64, i64}) -> {ptr, i64, i64} ----
+        // ---- action_list_tail({ptr, i64, i64}) -> {ptr, i64, i64} ----
         // Returns a new list without the first element (empty list if input is empty)
         let lt_fn = self.module.add_function(
-            "atomic_list_tail",
+            "action_list_tail",
             list_ty.fn_type(&[list_ty.into()], false),
             None,
         );
@@ -6781,7 +6781,7 @@ impl<'ctx> CodeGen<'ctx> {
             .build_conditional_branch(lt_empty_or_one, lt_empty_bb, lt_do);
         self.builder.position_at_end(lt_empty_bb);
         // Return empty list
-        let cc0 = self.call_rt("atomic_list_create", &[i64.const_int(0, false).into()])?;
+        let cc0 = self.call_rt("action_list_create", &[i64.const_int(0, false).into()])?;
         let lte_r = cc0.try_as_basic_value().unwrap_basic();
         let _ = self.builder.build_return(Some(&lte_r));
         // Copy elements [1..len)
@@ -6790,7 +6790,7 @@ impl<'ctx> CodeGen<'ctx> {
             .builder
             .build_int_sub(lt_len, i64.const_int(1, false), "nlen")
             .map_err(llvm_err)?;
-        let cc = self.call_rt("atomic_list_create", &[lt_nlen.into()])?;
+        let cc = self.call_rt("action_list_create", &[lt_nlen.into()])?;
         let lt_new = cc.try_as_basic_value().unwrap_basic().into_struct_value();
         let lt_data = self
             .builder
@@ -6841,7 +6841,7 @@ impl<'ctx> CodeGen<'ctx> {
             .build_load(self.list_type, lt_new_alloc, "cur")
             .map_err(llvm_err)?
             .into_struct_value();
-        let cc2 = self.call_rt("atomic_list_push", &[lt_cur.into(), lt_fv.into()])?;
+        let cc2 = self.call_rt("action_list_push", &[lt_cur.into(), lt_fv.into()])?;
         let lt_nv = cc2.try_as_basic_value().unwrap_basic();
         self.builder
             .build_store(lt_new_alloc, lt_nv)
@@ -6861,9 +6861,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&lt_rv));
 
-        // ---- atomic_list_zip({ptr,i64,i64}, {ptr,i64,i64}) -> {ptr,i64,i64} ----
+        // ---- action_list_zip({ptr,i64,i64}, {ptr,i64,i64}) -> {ptr,i64,i64} ----
         let lz_fn = self.module.add_function(
-            "atomic_list_zip",
+            "action_list_zip",
             list_ty.fn_type(&[list_ty.into(), list_ty.into()], false),
             None,
         );
@@ -6890,7 +6890,7 @@ impl<'ctx> CodeGen<'ctx> {
             .build_select(lz_altb, lz_alen, lz_blen, "min")
             .map_err(llvm_err)?
             .into_int_value();
-        let cc3 = self.call_rt("atomic_list_create", &[lz_min.into()])?;
+        let cc3 = self.call_rt("action_list_create", &[lz_min.into()])?;
         let lz_new = cc3.try_as_basic_value().unwrap_basic().into_struct_value();
         let lz_adata = self
             .builder
@@ -6992,7 +6992,7 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?
             .into_struct_value();
         let lz_push_cc = self.call_rt(
-            "atomic_list_push",
+            "action_list_push",
             &[lz_cur.into(), lz_fat2.as_basic_value_enum().into()],
         )?;
         let lz_nv = lz_push_cc.try_as_basic_value().unwrap_basic();
@@ -7014,9 +7014,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&lz_rv));
 
-        // ---- atomic_list_init({ptr, i64, i64}) -> {ptr, i64, i64} ----
+        // ---- action_list_init({ptr, i64, i64}) -> {ptr, i64, i64} ----
         let li_fn = self.module.add_function(
-            "atomic_list_init",
+            "action_list_init",
             list_ty.fn_type(&[list_ty.into()], false),
             None,
         );
@@ -7038,7 +7038,7 @@ impl<'ctx> CodeGen<'ctx> {
             .builder
             .build_conditional_branch(li_empty, li_empty_bb, li_do);
         self.builder.position_at_end(li_empty_bb);
-        let cce = self.call_rt("atomic_list_create", &[i64.const_int(0, false).into()])?;
+        let cce = self.call_rt("action_list_create", &[i64.const_int(0, false).into()])?;
         let li_er = cce.try_as_basic_value().unwrap_basic();
         let _ = self.builder.build_return(Some(&li_er));
         self.builder.position_at_end(li_do);
@@ -7046,7 +7046,7 @@ impl<'ctx> CodeGen<'ctx> {
             .builder
             .build_int_sub(li_len, i64.const_int(1, false), "nlen")
             .map_err(llvm_err)?;
-        let cc = self.call_rt("atomic_list_create", &[li_nlen.into()])?;
+        let cc = self.call_rt("action_list_create", &[li_nlen.into()])?;
         let li_new_init = cc.try_as_basic_value().unwrap_basic().into_struct_value();
         let li_data = self
             .builder
@@ -7096,7 +7096,7 @@ impl<'ctx> CodeGen<'ctx> {
             .build_load(self.list_type, li_new_alloc, "cur")
             .map_err(llvm_err)?
             .into_struct_value();
-        let cc2 = self.call_rt("atomic_list_push", &[li_cur.into(), li_fv.into()])?;
+        let cc2 = self.call_rt("action_list_push", &[li_cur.into(), li_fv.into()])?;
         let li_nv = cc2.try_as_basic_value().unwrap_basic();
         self.builder
             .build_store(li_new_alloc, li_nv)
@@ -7116,9 +7116,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&li_rv));
 
-        // ---- atomic_list_last({ptr, i64, i64}) -> {i64, ptr} ----
+        // ---- action_list_last({ptr, i64, i64}) -> {i64, ptr} ----
         let llast_fn = self.module.add_function(
-            "atomic_list_last",
+            "action_list_last",
             self.string_type.fn_type(&[list_ty.into()], false),
             None,
         );
@@ -7171,9 +7171,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&ll_val));
 
-        // ---- atomic_string_chars({i64, ptr}) -> {ptr, i64, i64} ----
+        // ---- action_string_chars({i64, ptr}) -> {ptr, i64, i64} ----
         let ch_fn = self.module.add_function(
-            "atomic_string_chars",
+            "action_string_chars",
             list_ty.fn_type(&[str_ty.into()], false),
             None,
         );
@@ -7190,7 +7190,7 @@ impl<'ctx> CodeGen<'ctx> {
             .build_extract_value(ch_s, 1, "sptr")
             .map_err(llvm_err)?
             .into_pointer_value();
-        let cc0 = self.call_rt("atomic_list_create", &[ch_len.into()])?;
+        let cc0 = self.call_rt("action_list_create", &[ch_len.into()])?;
         let ch_list_init = cc0.try_as_basic_value().unwrap_basic().into_struct_value();
         let ch_list_alloc = self
             .builder
@@ -7257,7 +7257,7 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?
             .into_struct_value();
         let ch_push = self.call_rt(
-            "atomic_list_push",
+            "action_list_push",
             &[ch_cur.into(), ch_fat_val.as_basic_value_enum().into()],
         )?;
         let ch_new = ch_push.try_as_basic_value().unwrap_basic();
@@ -7279,9 +7279,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&ch_rv));
 
-        // ---- atomic_list_with_index({ptr, i64, i64}) -> {ptr, i64, i64} ----
+        // ---- action_list_with_index({ptr, i64, i64}) -> {ptr, i64, i64} ----
         let wi_fn = self.module.add_function(
-            "atomic_list_with_index",
+            "action_list_with_index",
             list_ty.fn_type(&[list_ty.into()], false),
             None,
         );
@@ -7298,7 +7298,7 @@ impl<'ctx> CodeGen<'ctx> {
             .build_extract_value(wi_list, 0, "data")
             .map_err(llvm_err)?
             .into_pointer_value();
-        let cc = self.call_rt("atomic_list_create", &[wi_len.into()])?;
+        let cc = self.call_rt("action_list_create", &[wi_len.into()])?;
         let wi_new_init = cc.try_as_basic_value().unwrap_basic().into_struct_value();
         let wi_new_alloc = self
             .builder
@@ -7378,7 +7378,7 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?
             .into_struct_value();
         let cc2 = self.call_rt(
-            "atomic_list_push",
+            "action_list_push",
             &[wi_cur.into(), wi_fat2.as_basic_value_enum().into()],
         )?;
         let wi_nv = cc2.try_as_basic_value().unwrap_basic();
@@ -7400,9 +7400,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&wi_rv));
 
-        // ---- atomic_list_unique({ptr, i64, i64}) -> {ptr, i64, i64} ----
+        // ---- action_list_unique({ptr, i64, i64}) -> {ptr, i64, i64} ----
         let unq_fn = self.module.add_function(
-            "atomic_list_unique",
+            "action_list_unique",
             list_ty.fn_type(&[list_ty.into()], false),
             None,
         );
@@ -7419,7 +7419,7 @@ impl<'ctx> CodeGen<'ctx> {
             .build_extract_value(unq_list, 0, "data")
             .map_err(llvm_err)?
             .into_pointer_value();
-        let cc3 = self.call_rt("atomic_list_create", &[i64.const_int(0, false).into()])?;
+        let cc3 = self.call_rt("action_list_create", &[i64.const_int(0, false).into()])?;
         let unq_new_init = cc3.try_as_basic_value().unwrap_basic().into_struct_value();
         let unq_new_alloc = self
             .builder
@@ -7465,9 +7465,9 @@ impl<'ctx> CodeGen<'ctx> {
             .build_load(self.list_type, unq_new_alloc, "cur")
             .map_err(llvm_err)?
             .into_struct_value();
-        // Check if already in result: call atomic_list_contains
+        // Check if already in result: call action_list_contains
         let cc4 = self.call_rt(
-            "atomic_list_contains",
+            "action_list_contains",
             &[unq_cur.into(), unq_ev.as_basic_value_enum().into()],
         )?;
         let unq_found = cc4.try_as_basic_value().unwrap_basic().into_int_value();
@@ -7478,7 +7478,7 @@ impl<'ctx> CodeGen<'ctx> {
             .build_conditional_branch(unq_found, unq_skip_bb, unq_push_bb);
         self.builder.position_at_end(unq_push_bb);
         let cc5 = self.call_rt(
-            "atomic_list_push",
+            "action_list_push",
             &[unq_cur.into(), unq_ev.as_basic_value_enum().into()],
         )?;
         let unq_nv = cc5.try_as_basic_value().unwrap_basic();
@@ -7502,9 +7502,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&unq_rv));
 
-        // ---- atomic_list_slice({ptr, i64, i64}, i64 start, i64 end) -> {ptr, i64, i64} ----
+        // ---- action_list_slice({ptr, i64, i64}, i64 start, i64 end) -> {ptr, i64, i64} ----
         let slc_fn = self.module.add_function(
-            "atomic_list_slice",
+            "action_list_slice",
             list_ty.fn_type(&[list_ty.into(), i64.into(), i64.into()], false),
             None,
         );
@@ -7580,7 +7580,7 @@ impl<'ctx> CodeGen<'ctx> {
             .build_select(slc_rlen_neg, i64.const_int(0, false), slc_rlen, "rlenf")
             .map_err(llvm_err)?
             .into_int_value();
-        let cc6 = self.call_rt("atomic_list_create", &[slc_rlen_final.into()])?;
+        let cc6 = self.call_rt("action_list_create", &[slc_rlen_final.into()])?;
         let slc_new_init = cc6.try_as_basic_value().unwrap_basic().into_struct_value();
         let slc_new_alloc = self
             .builder
@@ -7625,7 +7625,7 @@ impl<'ctx> CodeGen<'ctx> {
             .build_load(self.list_type, slc_new_alloc, "cur")
             .map_err(llvm_err)?
             .into_struct_value();
-        let cc7 = self.call_rt("atomic_list_push", &[slc_cur.into(), slc_ev.into()])?;
+        let cc7 = self.call_rt("action_list_push", &[slc_cur.into(), slc_ev.into()])?;
         let slc_nv = cc7.try_as_basic_value().unwrap_basic();
         self.builder
             .build_store(slc_new_alloc, slc_nv)
@@ -7645,9 +7645,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&slc_rv));
 
-        // ---- atomic_string_split_lines({i64, ptr}) -> {ptr, i64, i64} ----
+        // ---- action_string_split_lines({i64, ptr}) -> {ptr, i64, i64} ----
         let sl_fn = self.module.add_function(
-            "atomic_string_split_lines",
+            "action_string_split_lines",
             list_ty.fn_type(&[str_ty.into()], false),
             None,
         );
@@ -7664,7 +7664,7 @@ impl<'ctx> CodeGen<'ctx> {
             .build_extract_value(sl_s, 1, "sptr")
             .map_err(llvm_err)?
             .into_pointer_value();
-        let cc4 = self.call_rt("atomic_list_create", &[i64.const_int(0, false).into()])?;
+        let cc4 = self.call_rt("action_list_create", &[i64.const_int(0, false).into()])?;
         let sl_list_init = cc4.try_as_basic_value().unwrap_basic().into_struct_value();
         // Use alloca to accumulate list across loop iterations
         let sl_list_alloc = self
@@ -7801,7 +7801,7 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?
             .into_struct_value();
         let sl_push_cc = self.call_rt(
-            "atomic_list_push",
+            "action_list_push",
             &[sl_cur_list.into(), sl_fat_val.as_basic_value_enum().into()],
         )?;
         let sl_new_list = sl_push_cc.try_as_basic_value().unwrap_basic();
@@ -7834,9 +7834,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&sl_result));
 
-        // ---- atomic_string_index_of({i64, ptr}, {i64, ptr}) -> i64 (returns -1 if not found) ----
+        // ---- action_string_index_of({i64, ptr}, {i64, ptr}) -> i64 (returns -1 if not found) ----
         let sio_fn = self.module.add_function(
-            "atomic_string_index_of",
+            "action_string_index_of",
             i64.fn_type(&[str_ty.into(), str_ty.into()], false),
             None,
         );
@@ -7959,9 +7959,9 @@ impl<'ctx> CodeGen<'ctx> {
             .builder
             .build_return(Some(&i64.const_int(-1i64 as u64, true)));
 
-        // ---- atomic_list_flatten({ptr, i64, i64}) -> {ptr, i64, i64} ----
+        // ---- action_list_flatten({ptr, i64, i64}) -> {ptr, i64, i64} ----
         let fl_fn = self.module.add_function(
-            "atomic_list_flatten",
+            "action_list_flatten",
             list_ty.fn_type(&[list_ty.into()], false),
             None,
         );
@@ -7978,7 +7978,7 @@ impl<'ctx> CodeGen<'ctx> {
             .build_extract_value(fl_input, 1, "len")
             .map_err(llvm_err)?
             .into_int_value();
-        let fl_result = self.call_rt("atomic_list_create", &[i64.const_int(4, false).into()])?;
+        let fl_result = self.call_rt("action_list_create", &[i64.const_int(4, false).into()])?;
         let fl_rb = fl_result.try_as_basic_value().unwrap_basic();
         let fl_ra = self
             .builder
@@ -8096,7 +8096,7 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?
             .into_struct_value();
         let fl_ps = self.call_rt(
-            "atomic_list_push",
+            "action_list_push",
             &[fl_cl.into(), fl_ie.as_basic_value_enum().into()],
         )?;
         self.builder
@@ -8119,7 +8119,7 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?
             .into_struct_value();
         let fl_ps2 = self.call_rt(
-            "atomic_list_push",
+            "action_list_push",
             &[fl_cl2.into(), fl_elem.as_basic_value_enum().into()],
         )?;
         self.builder
@@ -8142,9 +8142,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&fl_res));
 
-        // ---- atomic_list_split_at({ptr, i64, i64}, i64) -> {ptr, i64, i64} ----
+        // ---- action_list_split_at({ptr, i64, i64}, i64) -> {ptr, i64, i64} ----
         let sa_fn = self.module.add_function(
-            "atomic_list_split_at",
+            "action_list_split_at",
             list_ty.fn_type(&[list_ty.into(), i64.into()], false),
             None,
         );
@@ -8180,14 +8180,14 @@ impl<'ctx> CodeGen<'ctx> {
             .build_select(sa_cl2, sa_len, sa_idx0, "idx_safe")
             .map_err(llvm_err)?
             .into_int_value();
-        let sa_r1 = self.call_rt("atomic_list_create", &[i64.const_int(4, false).into()])?;
+        let sa_r1 = self.call_rt("action_list_create", &[i64.const_int(4, false).into()])?;
         let sa_r1v = sa_r1.try_as_basic_value().unwrap_basic();
         let sa_a1 = self
             .builder
             .build_alloca(self.list_type, "sa_a1")
             .map_err(llvm_err)?;
         self.builder.build_store(sa_a1, sa_r1v).map_err(llvm_err)?;
-        let sa_r2 = self.call_rt("atomic_list_create", &[i64.const_int(4, false).into()])?;
+        let sa_r2 = self.call_rt("action_list_create", &[i64.const_int(4, false).into()])?;
         let sa_r2v = sa_r2.try_as_basic_value().unwrap_basic();
         let sa_a2 = self
             .builder
@@ -8241,11 +8241,11 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?
             .into_struct_value();
         let sa_ps1 = self.call_rt(
-            "atomic_list_push",
+            "action_list_push",
             &[sa_l1.into(), sa_ev.as_basic_value_enum().into()],
         )?;
         let sa_ps2 = self.call_rt(
-            "atomic_list_push",
+            "action_list_push",
             &[sa_l2.into(), sa_ev.as_basic_value_enum().into()],
         )?;
         let sa_l1_sel = self
@@ -8356,9 +8356,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&sa_rtc));
 
-        // ---- atomic_list_chunks({ptr, i64, i64}, i64 chunk_size) -> {ptr, i64, i64} ----
+        // ---- action_list_chunks({ptr, i64, i64}, i64 chunk_size) -> {ptr, i64, i64} ----
         let ch_fn = self.module.add_function(
-            "atomic_list_chunks",
+            "action_list_chunks",
             list_ty.fn_type(&[list_ty.into(), i64.into()], false),
             None,
         );
@@ -8385,7 +8385,7 @@ impl<'ctx> CodeGen<'ctx> {
             .build_select(ch_cz, i64.const_int(1, false), ch_csize, "csafe")
             .map_err(llvm_err)?
             .into_int_value();
-        let ch_res = self.call_rt("atomic_list_create", &[i64.const_int(4, false).into()])?;
+        let ch_res = self.call_rt("action_list_create", &[i64.const_int(4, false).into()])?;
         let ch_resv = ch_res.try_as_basic_value().unwrap_basic();
         let ch_ra = self
             .builder
@@ -8414,7 +8414,7 @@ impl<'ctx> CodeGen<'ctx> {
             .builder
             .build_conditional_branch(ch_cond, ch_body, ch_done);
         self.builder.position_at_end(ch_body);
-        let ch_subl = self.call_rt("atomic_list_create", &[ch_csafe.into()])?;
+        let ch_subl = self.call_rt("action_list_create", &[ch_csafe.into()])?;
         let ch_sublv = ch_subl.try_as_basic_value().unwrap_basic();
         let ch_sa = self
             .builder
@@ -8478,7 +8478,7 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?
             .into_struct_value();
         let ch_ps = self.call_rt(
-            "atomic_list_push",
+            "action_list_push",
             &[ch_cl.into(), ch_ev.as_basic_value_enum().into()],
         )?;
         self.builder
@@ -8523,7 +8523,7 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?
             .into_struct_value();
         let ch_rps = self.call_rt(
-            "atomic_list_push",
+            "action_list_push",
             &[ch_rl.into(), ch_sublfv.as_basic_value_enum().into()],
         )?;
         self.builder
@@ -8537,9 +8537,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&ch_rt));
 
-        // ---- atomic_list_windows({ptr, i64, i64}, i64 win_size) -> {ptr, i64, i64} ----
+        // ---- action_list_windows({ptr, i64, i64}, i64 win_size) -> {ptr, i64, i64} ----
         let wn_fn = self.module.add_function(
-            "atomic_list_windows",
+            "action_list_windows",
             list_ty.fn_type(&[list_ty.into(), i64.into()], false),
             None,
         );
@@ -8583,7 +8583,7 @@ impl<'ctx> CodeGen<'ctx> {
             .build_select(wn_nz, i64.const_int(0, false), wn_nw1, "nwin")
             .map_err(llvm_err)?
             .into_int_value();
-        let wn_res = self.call_rt("atomic_list_create", &[i64.const_int(4, false).into()])?;
+        let wn_res = self.call_rt("action_list_create", &[i64.const_int(4, false).into()])?;
         let wn_resv = wn_res.try_as_basic_value().unwrap_basic();
         let wn_ra = self
             .builder
@@ -8612,7 +8612,7 @@ impl<'ctx> CodeGen<'ctx> {
             .builder
             .build_conditional_branch(wn_cond, wn_body, wn_done);
         self.builder.position_at_end(wn_body);
-        let wn_subl = self.call_rt("atomic_list_create", &[wn_wsafe.into()])?;
+        let wn_subl = self.call_rt("action_list_create", &[wn_wsafe.into()])?;
         let wn_sublv = wn_subl.try_as_basic_value().unwrap_basic();
         let wn_sa = self
             .builder
@@ -8663,7 +8663,7 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?
             .into_struct_value();
         let wn_ps = self.call_rt(
-            "atomic_list_push",
+            "action_list_push",
             &[wn_cl.into(), wn_ev.as_basic_value_enum().into()],
         )?;
         self.builder
@@ -8701,7 +8701,7 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?
             .into_struct_value();
         let wn_rps = self.call_rt(
-            "atomic_list_push",
+            "action_list_push",
             &[wn_rl.into(), wn_fv.as_basic_value_enum().into()],
         )?;
         self.builder
@@ -8720,9 +8720,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&wn_rt));
 
-        // ---- atomic_list_index_of({ptr, i64, i64}, {i64, ptr}) -> i64 ----
+        // ---- action_list_index_of({ptr, i64, i64}, {i64, ptr}) -> i64 ----
         let lio_fn = self.module.add_function(
-            "atomic_list_index_of",
+            "action_list_index_of",
             i64.fn_type(&[list_ty.into(), str_ty.into()], false),
             None,
         );
@@ -8832,10 +8832,10 @@ impl<'ctx> CodeGen<'ctx> {
             .builder
             .build_return(Some(&i64.const_int(-1i64 as u64, true)));
 
-        // ---- atomic_abs_f(f64) -> f64 ----
+        // ---- action_abs_f(f64) -> f64 ----
         let af_fn =
             self.module
-                .add_function("atomic_abs_f", f64.fn_type(&[f64.into()], false), None);
+                .add_function("action_abs_f", f64.fn_type(&[f64.into()], false), None);
         let af_entry = self.context.append_basic_block(af_fn, "entry");
         self.builder.position_at_end(af_entry);
         let af_val = af_fn.get_first_param().unwrap().into_float_value();
@@ -8854,9 +8854,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&af_r));
 
-        // ---- atomic_map_keys({ptr, i64, i64}) -> {ptr, i64, i64} ----
+        // ---- action_map_keys({ptr, i64, i64}) -> {ptr, i64, i64} ----
         let mk_fn = self.module.add_function(
-            "atomic_map_keys",
+            "action_map_keys",
             list_ty.fn_type(&[list_ty.into()], false),
             None,
         );
@@ -8877,7 +8877,7 @@ impl<'ctx> CodeGen<'ctx> {
             .builder
             .build_pointer_cast(mk_data, ptr, "data_i64")
             .map_err(llvm_err)?;
-        let mk_res = self.call_rt("atomic_list_create", &[i64.const_int(4, false).into()])?;
+        let mk_res = self.call_rt("action_list_create", &[i64.const_int(4, false).into()])?;
         let mk_resv = mk_res.try_as_basic_value().unwrap_basic();
         let mk_ra = self
             .builder
@@ -8956,7 +8956,7 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?
             .into_struct_value();
         let mk_ps = self.call_rt(
-            "atomic_list_push",
+            "action_list_push",
             &[mk_cl.into(), mk_key2.as_basic_value_enum().into()],
         )?;
         self.builder
@@ -8975,9 +8975,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&mk_rt));
 
-        // ---- atomic_map_values({ptr, i64, i64}) -> {ptr, i64, i64} ----
+        // ---- action_map_values({ptr, i64, i64}) -> {ptr, i64, i64} ----
         let mv_fn = self.module.add_function(
-            "atomic_map_values",
+            "action_map_values",
             list_ty.fn_type(&[list_ty.into()], false),
             None,
         );
@@ -8998,7 +8998,7 @@ impl<'ctx> CodeGen<'ctx> {
             .builder
             .build_pointer_cast(mv_data, ptr, "data_i64")
             .map_err(llvm_err)?;
-        let mv_res = self.call_rt("atomic_list_create", &[i64.const_int(4, false).into()])?;
+        let mv_res = self.call_rt("action_list_create", &[i64.const_int(4, false).into()])?;
         let mv_resv = mv_res.try_as_basic_value().unwrap_basic();
         let mv_ra = self
             .builder
@@ -9080,7 +9080,7 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?
             .into_struct_value();
         let mv_ps = self.call_rt(
-            "atomic_list_push",
+            "action_list_push",
             &[mv_cl.into(), mv_val2.as_basic_value_enum().into()],
         )?;
         self.builder
@@ -9099,9 +9099,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&mv_rt));
 
-        // ---- atomic_map_entries({ptr, i64, i64}) -> {ptr, i64, i64} ----
+        // ---- action_map_entries({ptr, i64, i64}) -> {ptr, i64, i64} ----
         let me_fn = self.module.add_function(
-            "atomic_map_entries",
+            "action_map_entries",
             list_ty.fn_type(&[list_ty.into()], false),
             None,
         );
@@ -9122,7 +9122,7 @@ impl<'ctx> CodeGen<'ctx> {
             .builder
             .build_pointer_cast(me_data, ptr, "data_i64")
             .map_err(llvm_err)?;
-        let me_res = self.call_rt("atomic_list_create", &[i64.const_int(4, false).into()])?;
+        let me_res = self.call_rt("action_list_create", &[i64.const_int(4, false).into()])?;
         let me_resv = me_res.try_as_basic_value().unwrap_basic();
         let me_ra = self
             .builder
@@ -9278,7 +9278,7 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?
             .into_struct_value();
         let me_ps = self.call_rt(
-            "atomic_list_push",
+            "action_list_push",
             &[me_cl.into(), me_fat2.as_basic_value_enum().into()],
         )?;
         self.builder
@@ -9297,10 +9297,10 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&me_rt));
 
-        // ---- atomic_set_union({ptr, i64, i64}, {ptr, i64, i64}) -> {ptr, i64, i64} ----
+        // ---- action_set_union({ptr, i64, i64}, {ptr, i64, i64}) -> {ptr, i64, i64} ----
         // Sets use map layout (4×i64 per entry). Result must be in map format.
         let su_fn = self.module.add_function(
-            "atomic_set_union",
+            "action_set_union",
             list_ty.fn_type(&[list_ty.into(), list_ty.into()], false),
             None,
         );
@@ -9326,9 +9326,9 @@ impl<'ctx> CodeGen<'ctx> {
             .builder
             .build_int_add(su_cap, i64.const_int(4, false), "cap4")
             .map_err(llvm_err)?;
-        let map_create_fn = self.module.get_function("atomic_map_create").unwrap();
-        let mi_fn = self.module.get_function("atomic_map_insert").unwrap();
-        let mc_fn = self.module.get_function("atomic_map_contains").unwrap();
+        let map_create_fn = self.module.get_function("action_map_create").unwrap();
+        let mi_fn = self.module.get_function("action_map_insert").unwrap();
+        let mc_fn = self.module.get_function("action_map_contains").unwrap();
         let su_res = self
             .builder
             .build_call(map_create_fn, &[su_cap4.into()], "res")
@@ -9543,10 +9543,10 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&su_rt));
 
-        // ---- atomic_set_intersection({ptr, i64, i64}, {ptr, i64, i64}) -> {ptr, i64, i64} ----
+        // ---- action_set_intersection({ptr, i64, i64}, {ptr, i64, i64}) -> {ptr, i64, i64} ----
         // Sets use map layout (4×i64 per entry). Result must be in map format.
         let si_fn = self.module.add_function(
-            "atomic_set_intersection",
+            "action_set_intersection",
             list_ty.fn_type(&[list_ty.into(), list_ty.into()], false),
             None,
         );
@@ -9563,9 +9563,9 @@ impl<'ctx> CodeGen<'ctx> {
             .builder
             .build_int_add(si_alen, i64.const_int(4, false), "cap4")
             .map_err(llvm_err)?;
-        let map_create_fn = self.module.get_function("atomic_map_create").unwrap();
-        let mi_fn = self.module.get_function("atomic_map_insert").unwrap();
-        let mc_fn = self.module.get_function("atomic_map_contains").unwrap();
+        let map_create_fn = self.module.get_function("action_map_create").unwrap();
+        let mi_fn = self.module.get_function("action_map_insert").unwrap();
+        let mc_fn = self.module.get_function("action_map_contains").unwrap();
         let si_res = self
             .builder
             .build_call(map_create_fn, &[si_cap4.into()], "res")
@@ -9715,10 +9715,10 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&si_rt));
 
-        // ---- atomic_set_difference({ptr, i64, i64}, {ptr, i64, i64}) -> {ptr, i64, i64} ----
+        // ---- action_set_difference({ptr, i64, i64}, {ptr, i64, i64}) -> {ptr, i64, i64} ----
         // Sets use map layout (4×i64 per entry). Result must be in map format.
         let sd_fn = self.module.add_function(
-            "atomic_set_difference",
+            "action_set_difference",
             list_ty.fn_type(&[list_ty.into(), list_ty.into()], false),
             None,
         );
@@ -9735,9 +9735,9 @@ impl<'ctx> CodeGen<'ctx> {
             .builder
             .build_int_add(sd_alen, i64.const_int(4, false), "cap4")
             .map_err(llvm_err)?;
-        let map_create_fn = self.module.get_function("atomic_map_create").unwrap();
-        let mi_fn = self.module.get_function("atomic_map_insert").unwrap();
-        let mc_fn = self.module.get_function("atomic_map_contains").unwrap();
+        let map_create_fn = self.module.get_function("action_map_create").unwrap();
+        let mi_fn = self.module.get_function("action_map_insert").unwrap();
+        let mc_fn = self.module.get_function("action_map_contains").unwrap();
         let sd_res = self
             .builder
             .build_call(map_create_fn, &[sd_cap4.into()], "res")
@@ -9893,11 +9893,11 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&sd_rt));
 
-        // ---- atomic_set_is_subset({ptr, i64, i64}, {ptr, i64, i64}) -> i1 ----
+        // ---- action_set_is_subset({ptr, i64, i64}, {ptr, i64, i64}) -> i1 ----
         // Sets use map layout: each entry = 4×i64 (key_tag, key_ptr_i64, val_tag, val_ptr_i64).
         // Compare only keys (offsets 0 and 1), skip values (offsets 2 and 3).
         let ss_fn = self.module.add_function(
-            "atomic_set_is_subset",
+            "action_set_is_subset",
             self.context
                 .bool_type()
                 .fn_type(&[list_ty.into(), list_ty.into()], false),
@@ -10137,7 +10137,7 @@ impl<'ctx> CodeGen<'ctx> {
             .builder
             .build_insert_value(b_fat1, b_ptr_val, 1, "bf2")
             .map_err(llvm_err)?;
-        let sseq_fn = self.module.get_function("atomic_string_eq").unwrap();
+        let sseq_fn = self.module.get_function("action_string_eq").unwrap();
         let sseq = self
             .builder
             .build_call(
@@ -10191,9 +10191,9 @@ impl<'ctx> CodeGen<'ctx> {
             .builder
             .build_return(Some(&self.context.bool_type().const_int(1, false)));
 
-        // ---- atomic_rand_shuffle({ptr, i64, i64}) -> {ptr, i64, i64} ----
+        // ---- action_rand_shuffle({ptr, i64, i64}) -> {ptr, i64, i64} ----
         let rs_fn = self.module.add_function(
-            "atomic_rand_shuffle",
+            "action_rand_shuffle",
             list_ty.fn_type(&[list_ty.into()], false),
             None,
         );
@@ -10211,7 +10211,7 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?
             .into_int_value();
         // Copy input list
-        let rs_copy = self.call_rt("atomic_list_create", &[i64.const_int(4, false).into()])?;
+        let rs_copy = self.call_rt("action_list_create", &[i64.const_int(4, false).into()])?;
         let rs_copyv = rs_copy.try_as_basic_value().unwrap_basic();
         let rs_ra = self
             .builder
@@ -10259,7 +10259,7 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?
             .into_struct_value();
         let rs_cps = self.call_rt(
-            "atomic_list_push",
+            "action_list_push",
             &[rs_ccl.into(), rs_cev.as_basic_value_enum().into()],
         )?;
         self.builder
@@ -10299,7 +10299,7 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(rs_fbody);
         // Generate random index [0, i]
         let rs_rand = self.call_rt(
-            "atomic_rand_int",
+            "action_rand_int",
             &[i64.const_int(0, false).into(), rs_iv.into()],
         )?;
         let rs_j = rs_rand.try_as_basic_value().unwrap_basic().into_int_value();
@@ -10347,9 +10347,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&rs_rt));
 
-        // ---- atomic_list_sorted({ptr, i64, i64}) -> {ptr, i64, i64} (Int-only for now) ----
+        // ---- action_list_sorted({ptr, i64, i64}) -> {ptr, i64, i64} (Int-only for now) ----
         let srt_fn = self.module.add_function(
-            "atomic_list_sorted",
+            "action_list_sorted",
             list_ty.fn_type(&[list_ty.into()], false),
             None,
         );
@@ -10367,7 +10367,7 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?
             .into_int_value();
         // Copy input
-        let srt_copy = self.call_rt("atomic_list_create", &[i64.const_int(4, false).into()])?;
+        let srt_copy = self.call_rt("action_list_create", &[i64.const_int(4, false).into()])?;
         let srt_copyv = srt_copy.try_as_basic_value().unwrap_basic();
         let srt_ra = self
             .builder
@@ -10414,7 +10414,7 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?
             .into_struct_value();
         let srt_cps = self.call_rt(
-            "atomic_list_push",
+            "action_list_push",
             &[srt_ccl.into(), srt_cev.as_basic_value_enum().into()],
         )?;
         self.builder
@@ -10596,10 +10596,10 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&srt_rt));
 
-        // ---- atomic_map_union({ptr, i64, i64}, {ptr, i64, i64}) -> {ptr, i64, i64} ----
+        // ---- action_map_union({ptr, i64, i64}, {ptr, i64, i64}) -> {ptr, i64, i64} ----
         // Merges two maps. Entries from second map overwrite first.
         let mu_fn = self.module.add_function(
-            "atomic_map_union",
+            "action_map_union",
             list_ty.fn_type(&[list_ty.into(), list_ty.into()], false),
             None,
         );
@@ -10627,8 +10627,8 @@ impl<'ctx> CodeGen<'ctx> {
                 "cap4",
             )
             .map_err(llvm_err)?;
-        let mu_create = self.module.get_function("atomic_map_create").unwrap();
-        let mi_fn = self.module.get_function("atomic_map_insert").unwrap();
+        let mu_create = self.module.get_function("action_map_create").unwrap();
+        let mi_fn = self.module.get_function("action_map_insert").unwrap();
         let mu_res = self
             .builder
             .build_call(mu_create, &[mu_cap.into()], "res")
@@ -10837,9 +10837,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&mu_rt));
 
-        // ---- atomic_pow(f64, f64) -> f64 ----
+        // ---- action_pow(f64, f64) -> f64 ----
         let pow_fn = self.module.add_function(
-            "atomic_pow",
+            "action_pow",
             f64.fn_type(&[f64.into(), f64.into()], false),
             None,
         );
@@ -10858,10 +10858,10 @@ impl<'ctx> CodeGen<'ctx> {
         let _ = self.builder.build_return(Some(&pow_r));
 
         // ---- RC (Reference Counting) runtime ----
-        // atomic_rc_inc(i8* ptr): increment refcount at ptr-8. Null-safe.
+        // action_rc_inc(i8* ptr): increment refcount at ptr-8. Null-safe.
         let rc_inc_fn =
             self.module
-                .add_function("atomic_rc_inc", void.fn_type(&[ptr.into()], false), None);
+                .add_function("action_rc_inc", void.fn_type(&[ptr.into()], false), None);
         let rc_inc_entry = self.context.append_basic_block(rc_inc_fn, "entry");
         let rc_inc_do = self.context.append_basic_block(rc_inc_fn, "do_inc");
         let rc_inc_done = self.context.append_basic_block(rc_inc_fn, "done");
@@ -10904,10 +10904,10 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(rc_inc_done);
         let _ = self.builder.build_return(None);
 
-        // atomic_rc_dec(i8* ptr): decrement refcount at ptr-8, free if zero. Null-safe.
+        // action_rc_dec(i8* ptr): decrement refcount at ptr-8, free if zero. Null-safe.
         let rc_dec_fn =
             self.module
-                .add_function("atomic_rc_dec", void.fn_type(&[ptr.into()], false), None);
+                .add_function("action_rc_dec", void.fn_type(&[ptr.into()], false), None);
         let rc_dec_entry = self.context.append_basic_block(rc_dec_fn, "entry");
         let rc_dec_null_bb = self.context.append_basic_block(rc_dec_fn, "null_check");
         let rc_dec_free_bb = self.context.append_basic_block(rc_dec_fn, "do_free");
@@ -10975,8 +10975,8 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(rc_dec_done_bb);
         let _ = self.builder.build_return(None);
 
-        // atomic_malloc_rc body (declared early near malloc)
-        let malloc_rc_fn = self.module.get_function("atomic_malloc_rc").unwrap();
+        // action_malloc_rc body (declared early near malloc)
+        let malloc_rc_fn = self.module.get_function("action_malloc_rc").unwrap();
         let malloc_rc_entry = self.context.append_basic_block(malloc_rc_fn, "entry");
         self.builder.position_at_end(malloc_rc_entry);
         let malloc_rc_size = malloc_rc_fn.get_first_param().unwrap().into_int_value();
@@ -11009,9 +11009,9 @@ impl<'ctx> CodeGen<'ctx> {
         }?;
         let _ = self.builder.build_return(Some(&malloc_rc_data));
 
-        // atomic_utf8_encode body: encode a Unicode code point into UTF-8 bytes
+        // action_utf8_encode body: encode a Unicode code point into UTF-8 bytes
         // Takes (i64 code_point, i8* buf) -> returns i64 byte_count (1-4)
-        let utf8_encode_fn_body = self.module.get_function("atomic_utf8_encode").unwrap();
+        let utf8_encode_fn_body = self.module.get_function("action_utf8_encode").unwrap();
         let utf8_entry = self
             .context
             .append_basic_block(utf8_encode_fn_body, "entry");
@@ -11272,8 +11272,8 @@ impl<'ctx> CodeGen<'ctx> {
         let _ = self.builder.build_store(ugp4_3, ub4_3).map_err(llvm_err)?;
         let _ = self.builder.build_return(Some(&i64.const_int(4, false)));
 
-        // atomic_utf8_byte_len body: determine UTF-8 byte count from leading byte
-        let utf8_bl_fn = self.module.get_function("atomic_utf8_byte_len").unwrap();
+        // action_utf8_byte_len body: determine UTF-8 byte count from leading byte
+        let utf8_bl_fn = self.module.get_function("action_utf8_byte_len").unwrap();
         let bl_entry = self.context.append_basic_block(utf8_bl_fn, "entry");
         self.builder.position_at_end(bl_entry);
         let bl_byte = utf8_bl_fn.get_first_param().unwrap().into_int_value();
@@ -11367,7 +11367,7 @@ impl<'ctx> CodeGen<'ctx> {
     }
 
     pub(super) fn emit_read_line_runtime(&self) -> Result<(), String> {
-        if self.module.get_function("atomic_read_line").is_some() {
+        if self.module.get_function("action_read_line").is_some() {
             return Ok(());
         }
         let saved_pos = self.builder.get_insert_block();
@@ -11385,7 +11385,7 @@ impl<'ctx> CodeGen<'ctx> {
             .struct_type(&[i64.into(), ptr.into(), self.bool_ty().into()], false);
         let rl_fn =
             self.module
-                .add_function("atomic_read_line", rl_ret_ty.fn_type(&[], false), None);
+                .add_function("action_read_line", rl_ret_ty.fn_type(&[], false), None);
         let fgets_fn = self.module.get_function("fgets").unwrap();
         let entry = self.context.append_basic_block(rl_fn, "entry");
         self.builder.position_at_end(entry);
@@ -11500,7 +11500,7 @@ impl<'ctx> CodeGen<'ctx> {
     }
 
     pub(super) fn emit_read_dir_runtime(&self) -> Result<(), String> {
-        if self.module.get_function("atomic_read_dir").is_some() {
+        if self.module.get_function("action_read_dir").is_some() {
             return Ok(());
         }
         let saved_pos = self.builder.get_insert_block();
@@ -11524,7 +11524,7 @@ impl<'ctx> CodeGen<'ctx> {
             None,
         );
         let rd_fn = self.module.add_function(
-            "atomic_read_dir",
+            "action_read_dir",
             self.list_type.fn_type(&[str_ty.into()], false),
             None,
         );
@@ -11536,7 +11536,7 @@ impl<'ctx> CodeGen<'ctx> {
             .build_extract_value(rd_path, 1, "path_data")
             .map_err(llvm_err)?
             .into_pointer_value();
-        let rd_empty = self.module.get_function("atomic_list_create").unwrap();
+        let rd_empty = self.module.get_function("action_list_create").unwrap();
         let rd_init = self
             .builder
             .build_call(rd_empty, &[i64.const_int(0, false).into()], "rd_init")
@@ -11621,7 +11621,7 @@ impl<'ctx> CodeGen<'ctx> {
             .try_as_basic_value()
             .unwrap_basic()
             .into_int_value();
-        let rd_asc_fn = self.module.get_function("atomic_string_create").unwrap();
+        let rd_asc_fn = self.module.get_function("action_string_create").unwrap();
         let rd_new_str = self
             .builder
             .build_call(rd_asc_fn, &[rd_name.into(), rd_nlen.into()], "")
@@ -11629,7 +11629,7 @@ impl<'ctx> CodeGen<'ctx> {
             .try_as_basic_value()
             .unwrap_basic()
             .into_struct_value();
-        let rd_push_fn = self.module.get_function("atomic_list_push").unwrap();
+        let rd_push_fn = self.module.get_function("action_list_push").unwrap();
         let rd_cur_list = self
             .builder
             .build_load(self.list_type, rd_cur_a, "rd_cur_v")

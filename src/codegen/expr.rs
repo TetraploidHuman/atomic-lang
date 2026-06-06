@@ -398,7 +398,7 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(llvm_err)?;
         let len = self.i64_ty().const_int(s.len() as u64, false);
         let cc = self.call_rt(
-            "atomic_string_create",
+            "action_string_create",
             &[g.as_pointer_value().into(), len.into()],
         )?;
         match cc.try_as_basic_value().basic() {
@@ -872,7 +872,7 @@ impl<'ctx> CodeGen<'ctx> {
                         .into_int_value();
                     Ok(TypedValue::Int(val))
                 } else if st == self.string_type {
-                    // Named __atomic_str type — must check before enum_types since
+                    // Named __action_str type — must check before enum_types since
                     // enum types are anonymous {i64, ptr} which used to collide.
                     Ok(TypedValue::Str(alloca))
                 } else if self.enum_types.values().any(|et| *et == st) {
@@ -1130,7 +1130,7 @@ impl<'ctx> CodeGen<'ctx> {
                     .map_err(llvm_err)?,
             )),
             (TypedValue::Str(a), TypedValue::Str(b)) => {
-                let cc = self.call_rt_with_2str("atomic_string_concat", *a, *b)?;
+                let cc = self.call_rt_with_2str("action_string_concat", *a, *b)?;
                 match cc.try_as_basic_value().basic() {
                     Some(bv) => {
                         let alloca = self
@@ -1229,7 +1229,7 @@ impl<'ctx> CodeGen<'ctx> {
     ) -> Result<TypedValue<'ctx>, String> {
         match (l, r) {
             (TypedValue::Int(a), TypedValue::Int(b)) => {
-                let pow_fn = self.module.get_function("atomic_int_pow").unwrap();
+                let pow_fn = self.module.get_function("action_int_pow").unwrap();
                 let result = self
                     .builder
                     .build_call(pow_fn, &[(*a).into(), (*b).into()], "pow")
@@ -1321,7 +1321,7 @@ impl<'ctx> CodeGen<'ctx> {
             (TypedValue::Str(a), TypedValue::Str(b)) => {
                 let sa = self.load_string(*a)?;
                 let sb = self.load_string(*b)?;
-                let cc = self.call_rt("atomic_string_eq", &[sa.into(), sb.into()])?;
+                let cc = self.call_rt("action_string_eq", &[sa.into(), sb.into()])?;
                 Ok(TypedValue::Bool(
                     cc.try_as_basic_value()
                         .basic()
@@ -1367,7 +1367,7 @@ impl<'ctx> CodeGen<'ctx> {
             (TypedValue::Str(a), TypedValue::Str(b)) => {
                 let sa = self.load_string(*a)?;
                 let sb = self.load_string(*b)?;
-                let cc = self.call_rt("atomic_string_eq", &[sa.into(), sb.into()])?;
+                let cc = self.call_rt("action_string_eq", &[sa.into(), sb.into()])?;
                 let eq = cc
                     .try_as_basic_value()
                     .basic()
@@ -1420,7 +1420,7 @@ impl<'ctx> CodeGen<'ctx> {
             (TypedValue::Str(a), TypedValue::Str(b)) => {
                 let sa = self.load_string(*a)?;
                 let sb = self.load_string(*b)?;
-                let cc = self.call_rt("atomic_string_compare", &[sa.into(), sb.into()])?;
+                let cc = self.call_rt("action_string_compare", &[sa.into(), sb.into()])?;
                 let cmp = cc
                     .try_as_basic_value()
                     .basic()
@@ -1508,7 +1508,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let elem_fat = self.to_fat_struct(&value)?;
                         let list_val = self.load_list(ptr)?;
                         let cc = self
-                            .call_rt("atomic_list_contains", &[list_val.into(), elem_fat.into()])?;
+                            .call_rt("action_list_contains", &[list_val.into(), elem_fat.into()])?;
                         let result_bv = cc
                             .try_as_basic_value()
                             .basic()
@@ -1527,7 +1527,7 @@ impl<'ctx> CodeGen<'ctx> {
                             .build_load(self.list_type, list_field, "in_strm_lv")
                             .map_err(llvm_err)?;
                         let cc = self
-                            .call_rt("atomic_list_contains", &[list_val.into(), elem_fat.into()])?;
+                            .call_rt("action_list_contains", &[list_val.into(), elem_fat.into()])?;
                         let result_bv = cc
                             .try_as_basic_value()
                             .basic()
@@ -1539,7 +1539,7 @@ impl<'ctx> CodeGen<'ctx> {
                         let key_fat = self.to_fat_struct(&value)?;
                         let map_val = self.load_list(ptr)?;
                         let cc =
-                            self.call_rt("atomic_map_contains", &[map_val.into(), key_fat.into()])?;
+                            self.call_rt("action_map_contains", &[map_val.into(), key_fat.into()])?;
                         let result_bv = cc
                             .try_as_basic_value()
                             .basic()
@@ -1771,25 +1771,25 @@ impl<'ctx> CodeGen<'ctx> {
             return Ok(TypedValue::Fn(fn_ptr, fn_type));
         }
 
-        // Handle Type.method pattern: ::Int.toString -> atomic_int_to_string
+        // Handle Type.method pattern: ::Int.toString -> action_int_to_string
         if let Some((type_part, method)) = name.rsplit_once('.') {
             let type_name = type_part;
             // Map type-method to runtime function name
-            // Many builtins have corresponding atomic_* runtime functions
+            // Many builtins have corresponding action_* runtime functions
             let rt_name = match (type_name, method) {
                 // Int/Float/Bool -> String conversions
-                ("Int", "toString") | ("Bool", "toString") => "atomic_int_to_string",
-                ("Float", "toString") => "atomic_float_to_string",
+                ("Int", "toString") | ("Bool", "toString") => "action_int_to_string",
+                ("Float", "toString") => "action_float_to_string",
                 // String methods
-                ("String", "len") | ("String", "length") => "atomic_string_len",
-                ("String", "to_upper") => "atomic_string_to_upper",
-                ("String", "to_lower") => "atomic_string_to_lower",
-                ("String", "trim") => "atomic_string_trim",
-                ("String", "substring") => "atomic_string_substring",
-                ("String", "starts_with") => "atomic_string_starts_with",
-                ("String", "ends_with") => "atomic_string_ends_with",
-                ("String", "split") => "atomic_string_split",
-                ("String", "contains") => "atomic_string_contains",
+                ("String", "len") | ("String", "length") => "action_string_len",
+                ("String", "to_upper") => "action_string_to_upper",
+                ("String", "to_lower") => "action_string_to_lower",
+                ("String", "trim") => "action_string_trim",
+                ("String", "substring") => "action_string_substring",
+                ("String", "starts_with") => "action_string_starts_with",
+                ("String", "ends_with") => "action_string_ends_with",
+                ("String", "split") => "action_string_split",
+                ("String", "contains") => "action_string_contains",
                 ("String", "to_int") | ("String", "to_float") => {
                     return Err(format!(
                         "::{}::{} cannot be used as a function reference (requires parsing)",
@@ -1797,31 +1797,31 @@ impl<'ctx> CodeGen<'ctx> {
                     ));
                 }
                 // List methods
-                ("List", "len") | ("Map", "len") | ("Set", "len") => "atomic_list_len",
-                ("List", "head") => "atomic_list_head",
-                ("List", "last") => "atomic_list_last",
-                ("List", "tail") => "atomic_list_tail",
-                ("List", "init") => "atomic_list_init",
-                ("List", "reverse") => "atomic_list_reverse",
-                ("List", "take") => "atomic_list_take",
-                ("List", "drop") => "atomic_list_drop",
-                ("List", "contains") => "atomic_list_contains",
-                ("List", "zip") => "atomic_list_zip",
-                ("List", "get") => "atomic_list_get",
-                ("List", "append") | ("List", "push") => "atomic_list_push",
-                ("List", "range") => "atomic_list_range",
+                ("List", "len") | ("Map", "len") | ("Set", "len") => "action_list_len",
+                ("List", "head") => "action_list_head",
+                ("List", "last") => "action_list_last",
+                ("List", "tail") => "action_list_tail",
+                ("List", "init") => "action_list_init",
+                ("List", "reverse") => "action_list_reverse",
+                ("List", "take") => "action_list_take",
+                ("List", "drop") => "action_list_drop",
+                ("List", "contains") => "action_list_contains",
+                ("List", "zip") => "action_list_zip",
+                ("List", "get") => "action_list_get",
+                ("List", "append") | ("List", "push") => "action_list_push",
+                ("List", "range") => "action_list_range",
                 // Map methods
-                ("Map", "contains") => "atomic_map_contains",
-                ("Map", "get") => "atomic_map_get",
-                ("Map", "insert") => "atomic_map_insert",
-                ("Map", "remove") => "atomic_map_remove",
+                ("Map", "contains") => "action_map_contains",
+                ("Map", "get") => "action_map_get",
+                ("Map", "insert") => "action_map_insert",
+                ("Map", "remove") => "action_map_remove",
                 // Other String methods with runtime functions
-                ("String", "chars") => "atomic_string_chars",
-                ("String", "join") => "atomic_string_join",
-                ("String", "replace") => "atomic_string_replace",
-                ("String", "repeat") => "atomic_string_repeat",
-                ("String", "trim_start") => "atomic_string_trim_start",
-                ("String", "trim_end") => "atomic_string_trim_end",
+                ("String", "chars") => "action_string_chars",
+                ("String", "join") => "action_string_join",
+                ("String", "replace") => "action_string_replace",
+                ("String", "repeat") => "action_string_repeat",
+                ("String", "trim_start") => "action_string_trim_start",
+                ("String", "trim_end") => "action_string_trim_end",
                 // Methods without simple runtime function counterparts
                 ("List", "map")
                 | ("List", "filter")

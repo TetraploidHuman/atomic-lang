@@ -66,26 +66,26 @@ fn map_host_symbols(cg: &CodeGen, engine: &inkwell::execution_engine::ExecutionE
     // be made visible to the JIT.
     // Declared in src/http_runtime.rs
     extern "C" {
-        fn atomic_http_request(
+        fn action_http_request(
             _: *const std::ffi::c_char,
             _: *const std::ffi::c_char,
             _: *const std::ffi::c_char,
             _: *const std::ffi::c_char,
             _: i64,
         ) -> *mut std::ffi::c_char;
-        fn atomic_http_free(_: *mut std::ffi::c_char);
-        fn atomic_test_ping() -> i64;
+        fn action_http_free(_: *mut std::ffi::c_char);
+        fn action_test_ping() -> i64;
     }
     for name in [
-        "atomic_http_request",
-        "atomic_http_free",
-        "atomic_test_ping",
+        "action_http_request",
+        "action_http_free",
+        "action_test_ping",
     ] {
         if let Some(func) = cg.module.get_function(name) {
             let addr = match name {
-                "atomic_http_request" => atomic_http_request as *const () as usize,
-                "atomic_http_free" => atomic_http_free as *const () as usize,
-                "atomic_test_ping" => atomic_test_ping as *const () as usize,
+                "action_http_request" => action_http_request as *const () as usize,
+                "action_http_free" => action_http_free as *const () as usize,
+                "action_test_ping" => action_test_ping as *const () as usize,
                 _ => continue,
             };
             engine.add_global_mapping(&func, addr);

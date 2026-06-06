@@ -108,16 +108,16 @@ jobs:
         run: |
           set -euo pipefail
           VER="${{ steps.ver.outputs.value }}"
-          PKG="atomic-${VER}-linux-${{ matrix.arch }}"
+          PKG="action-${VER}-linux-${{ matrix.arch }}"
           DIR="/tmp/${PKG}"
 
           mkdir -p "${DIR}/bin" "${DIR}/examples"
 
-          cp "target/${{ matrix.target }}/release/atomic" "${DIR}/bin/"
+          cp "target/${{ matrix.target }}/release/action" "${DIR}/bin/"
           cp README.md "${DIR}/"
           cp -r examples/* "${DIR}/examples/" 2>/dev/null || true
 
-          strip "${DIR}/bin/atomic" 2>/dev/null || true
+          strip "${DIR}/bin/action" 2>/dev/null || true
 
           cd /tmp
           tar czf "${PKG}.tar.gz" "${PKG}"
@@ -130,13 +130,13 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $VER = "${{ steps.ver.outputs.value }}"
-          $PKG = "atomic-${VER}-windows-x64"
+          $PKG = "action-${VER}-windows-x64"
           $DIR = "C:\${PKG}"
 
           New-Item -ItemType Directory -Force -Path "$DIR\bin" | Out-Null
           New-Item -ItemType Directory -Force -Path "$DIR\examples" | Out-Null
 
-          Copy-Item "target\${{ matrix.target }}\release\atomic.exe" -Destination "$DIR\bin\"
+          Copy-Item "target\${{ matrix.target }}\release\action.exe" -Destination "$DIR\bin\"
           Copy-Item "README.md" -Destination "$DIR\"
           Copy-Item "examples\*" -Destination "$DIR\examples\" -Recurse -Force -ErrorAction SilentlyContinue
 
@@ -200,16 +200,16 @@ jobs:
 
             | Platform | Package |
             |----------|---------|
-            | Linux x64 | [atomic-${{ steps.ver.outputs.value }}-linux-x64.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-linux-x64.tar.gz) |
-            | Windows x64 | [atomic-${{ steps.ver.outputs.value }}-windows-x64.zip](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/atomic-${{ steps.ver.outputs.value }}-windows-x64.zip) |
+            | Linux x64 | [action-${{ steps.ver.outputs.value }}-linux-x64.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/action-${{ steps.ver.outputs.value }}-linux-x64.tar.gz) |
+            | Windows x64 | [action-${{ steps.ver.outputs.value }}-windows-x64.zip](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/action-${{ steps.ver.outputs.value }}-windows-x64.zip) |
 
             ### Installation
             Extract the archive and add the `bin/` directory to your PATH.
 
             ```bash
             # Linux
-            tar xzf atomic-${{ steps.ver.outputs.value }}-linux-x64.tar.gz
-            export PATH="$PWD/atomic-${{ steps.ver.outputs.value }}-linux-x64/bin:$PATH"
-            atomic run hello.at
+            tar xzf action-${{ steps.ver.outputs.value }}-linux-x64.tar.gz
+            export PATH="$PWD/action-${{ steps.ver.outputs.value }}-linux-x64/bin:$PATH"
+            action run hello.at
             ```
           generate_release_notes: true

@@ -3,6 +3,17 @@
 version = 4
 
 [[package]]
+name = "action"
+version = "0.1.2"
+dependencies = [
+ "ariadne",
+ "clap",
+ "inkwell",
+ "llvm-sys",
+ "toml",
+]
+
+[[package]]
 name = "anstream"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -66,17 +77,6 @@ checksum = "44055e597c674aef7cb903b2b9f6e4cba1277ed0d2d61dae7cd52d7ffa81f8e2"
 dependencies = [
  "unicode-width",
  "yansi",
-]
-
-[[package]]
-name = "atomic"
-version = "0.1.0"
-dependencies = [
- "ariadne",
- "clap",
- "inkwell",
- "llvm-sys",
- "toml",
 ]
 
 [[package]]

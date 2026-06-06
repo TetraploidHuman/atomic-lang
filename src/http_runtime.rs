@@ -15,18 +15,18 @@ static ATOMIC_HTTP_REQUEST_PTR: unsafe extern "C" fn(
     *const c_char,
     *const c_char,
     i64,
-) -> *mut c_char = atomic_http_request;
+) -> *mut c_char = action_http_request;
 #[used]
-static ATOMIC_HTTP_FREE_PTR: unsafe extern "C" fn(*mut c_char) = atomic_http_free;
+static ATOMIC_HTTP_FREE_PTR: unsafe extern "C" fn(*mut c_char) = action_http_free;
 
 // Simple test function to verify JIT FFI works
 #[no_mangle]
-pub extern "C" fn atomic_test_ping() -> i64 {
+pub extern "C" fn action_test_ping() -> i64 {
     42
 }
 
 #[used]
-static ATOMIC_TEST_PING_PTR: unsafe extern "C" fn() -> i64 = atomic_test_ping;
+static ATOMIC_TEST_PING_PTR: unsafe extern "C" fn() -> i64 = action_test_ping;
 
 /// Perform an HTTP request using system curl.
 ///
@@ -39,9 +39,9 @@ static ATOMIC_TEST_PING_PTR: unsafe extern "C" fn() -> i64 = atomic_test_ping;
 ///
 /// Returns a C string in format "STATUS_CODE\nRESPONSE_BODY"
 /// On error, returns "0\nError message"
-/// Caller must free with atomic_http_free()
+/// Caller must free with action_http_free()
 #[no_mangle]
-pub extern "C" fn atomic_http_request(
+pub extern "C" fn action_http_request(
     method: *const c_char,
     url: *const c_char,
     headers: *const c_char,
@@ -118,9 +118,9 @@ pub extern "C" fn atomic_http_request(
     }
 }
 
-/// Free a string returned by atomic_http_request
+/// Free a string returned by action_http_request
 #[no_mangle]
-pub extern "C" fn atomic_http_free(ptr: *mut c_char) {
+pub extern "C" fn action_http_free(ptr: *mut c_char) {
     if !ptr.is_null() {
         unsafe {
             drop(CString::from_raw(ptr));

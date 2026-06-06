@@ -397,7 +397,7 @@ impl<'ctx> CodeGen<'ctx> {
         let module = context.create_module(name);
         let builder = context.create_builder();
         // Named type to distinguish from anonymous {i64, i8*} enum types
-        let string_type = context.opaque_struct_type("__atomic_str");
+        let string_type = context.opaque_struct_type("__action_str");
         string_type.set_body(
             &[
                 context.i64_type().into(),
@@ -553,8 +553,8 @@ impl<'ctx> CodeGen<'ctx> {
     pub(super) fn malloc_rc(&self, size: IntValue<'ctx>) -> Result<PointerValue<'ctx>, String> {
         let func = self
             .module
-            .get_function("atomic_malloc_rc")
-            .ok_or("atomic_malloc_rc not found")?;
+            .get_function("action_malloc_rc")
+            .ok_or("action_malloc_rc not found")?;
         let result = self
             .builder
             .build_call(func, &[size.into()], "malloc_rc")
@@ -567,13 +567,13 @@ impl<'ctx> CodeGen<'ctx> {
 
     /// Increment refcount on a heap-allocated value.
     pub(super) fn rc_inc(&self, ptr: PointerValue<'ctx>) -> Result<(), String> {
-        self.call_rt("atomic_rc_inc", &[ptr.into()])?;
+        self.call_rt("action_rc_inc", &[ptr.into()])?;
         Ok(())
     }
 
     /// Decrement refcount on a heap-allocated value (frees if refcount reaches 0).
     pub(super) fn rc_dec(&self, ptr: PointerValue<'ctx>) -> Result<(), String> {
-        self.call_rt("atomic_rc_dec", &[ptr.into()])?;
+        self.call_rt("action_rc_dec", &[ptr.into()])?;
         Ok(())
     }
 

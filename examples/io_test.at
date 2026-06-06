@@ -17,17 +17,17 @@ fun main() {
 
     // Test append_file
     print("append: ")
-    print(append_file("/tmp/atomic_test_append.txt", "hello\n"))
+    print(append_file("/tmp/action_test_append.txt", "hello\n"))
     println("")
 
     // Verify the appended file exists
     print("appended exists: ")
-    print(exists("/tmp/atomic_test_append.txt"))
+    print(exists("/tmp/action_test_append.txt"))
     println("")
 
     // Cleanup
     print("delete test: ")
-    print(delete_file("/tmp/atomic_test_append.txt"))
+    print(delete_file("/tmp/action_test_append.txt"))
     println("")
 
     println("done")

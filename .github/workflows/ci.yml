@@ -105,17 +105,17 @@ jobs:
         shell: bash
         if: runner.os == 'Windows'
         run: |
-          ATOMIC="target/${{ matrix.target }}/debug/atomic"
+          ACTION="target/${{ matrix.target }}/debug/action"
           if [ "${{ runner.os }}" = "Windows" ]; then
-            ATOMIC="$ATOMIC.exe"
+            ACTION="$ACTION.exe"
           fi
-          echo "Running $ATOMIC check examples/hello.at"
-          "$ATOMIC" check examples/hello.at
+          echo "Running $ACTION check examples/hello.at"
+          "$ACTION" check examples/hello.at
           echo "Smoke test passed."
       - name: Smoke test (Linux)
         if: runner.os == 'Linux'
         run: |
-          nix-shell --run './target/${{ matrix.target }}/debug/atomic check examples/hello.at'
+          nix-shell --run './target/${{ matrix.target }}/debug/action check examples/hello.at'
           echo "Smoke test passed."
 
       # ── Test ──────────────────────────────────────────
@@ -131,21 +131,21 @@ jobs:
         if: failure() && runner.os == 'Windows'
         shell: pwsh
         run: |
-          $atomic = "target/${{ matrix.target }}/debug/atomic.exe"
-          Write-Host "Running $atomic run examples/hello.at"
-          & $atomic run examples/hello.at *>&1 | Tee-Object -FilePath atomic_run_output.txt
+          $action = "target/${{ matrix.target }}/debug/action.exe"
+          Write-Host "Running $action run examples/hello.at"
+          & $action run examples/hello.at *>&1 | Tee-Object -FilePath action_run_output.txt
           Write-Host "Exit code: $LASTEXITCODE"
-          Get-Content atomic_run_output.txt
+          Get-Content action_run_output.txt
       - name: Debug run output (Linux)
         if: failure() && runner.os == 'Linux'
         run: |
-          nix-shell --run './target/${{ matrix.target }}/debug/atomic run examples/hello.at' 2>&1 | tee atomic_run_output.txt
+          nix-shell --run './target/${{ matrix.target }}/debug/action run examples/hello.at' 2>&1 | tee action_run_output.txt
       - name: Upload run output
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: run-output-${{ matrix.name }}-${{ github.run_id }}
-          path: atomic_run_output.txt
+          path: action_run_output.txt
 
   lint:
     name: Lint & fmt

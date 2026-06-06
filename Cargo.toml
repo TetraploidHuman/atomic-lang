@@ -1,10 +1,10 @@
 [package]
-name = "atomic"
+name = "action"
 version = "0.1.2"
 edition = "2021"
 
 [[bin]]
-name = "atomic"
+name = "action"
 path = "src/main.rs"
 
 [dependencies]

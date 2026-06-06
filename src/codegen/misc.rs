@@ -53,7 +53,7 @@ impl<'ctx> CodeGen<'ctx> {
         match o {
             TypedValue::List(list_ptr) | TypedValue::LazyList(list_ptr) => {
                 let list_val = self.load_list(list_ptr)?;
-                let cc = self.call_rt("atomic_list_get", &[list_val.into(), index_val.into()])?;
+                let cc = self.call_rt("action_list_get", &[list_val.into(), index_val.into()])?;
                 match cc.try_as_basic_value().basic() {
                     Some(bv) => {
                         // list_get returns {i64, ptr} fat struct — the universal value repr.
@@ -125,8 +125,8 @@ impl<'ctx> CodeGen<'ctx> {
         let map_loaded = self.load_list(map_ptr)?;
         let contains_fn = self
             .module
-            .get_function("atomic_map_contains")
-            .ok_or("atomic_map_contains not found")?;
+            .get_function("action_map_contains")
+            .ok_or("action_map_contains not found")?;
         let cc = self
             .builder
             .build_call(
@@ -159,8 +159,8 @@ impl<'ctx> CodeGen<'ctx> {
         let map_loaded2 = self.load_list(map_ptr)?;
         let get_fn = self
             .module
-            .get_function("atomic_map_get")
-            .ok_or("atomic_map_get not found")?;
+            .get_function("action_map_get")
+            .ok_or("action_map_get not found")?;
         // Need to re-compile key since we're in a different basic block
         let key_val2 = self.compile_expr(idx)?;
         let key_fat2 = self.to_fat_struct(&key_val2)?;
@@ -268,8 +268,8 @@ impl<'ctx> CodeGen<'ctx> {
         let set_loaded = self.load_list(set_ptr)?;
         let contains_fn = self
             .module
-            .get_function("atomic_map_contains")
-            .ok_or("atomic_map_contains not found")?;
+            .get_function("action_map_contains")
+            .ok_or("action_map_contains not found")?;
         let cc = self
             .builder
             .build_call(
@@ -772,7 +772,7 @@ impl<'ctx> CodeGen<'ctx> {
                 result = match result {
                     None => Some(ptr),
                     Some(acc) => {
-                        let cc = self.call_rt_with_2str("atomic_string_concat", acc, ptr)?;
+                        let cc = self.call_rt_with_2str("action_string_concat", acc, ptr)?;
                         match cc.try_as_basic_value().basic() {
                             Some(bv) => {
                                 let alloca = self
@@ -807,7 +807,7 @@ impl<'ctx> CodeGen<'ctx> {
     ) -> Result<Option<PointerValue<'ctx>>, String> {
         match val {
             TypedValue::Int(iv) => {
-                let cc = self.call_rt("atomic_int_to_string", &[(*iv).into()])?;
+                let cc = self.call_rt("action_int_to_string", &[(*iv).into()])?;
                 match cc.try_as_basic_value().basic() {
                     Some(bv) => {
                         let alloca = self
@@ -821,7 +821,7 @@ impl<'ctx> CodeGen<'ctx> {
                 }
             }
             TypedValue::Float(fv) => {
-                let cc = self.call_rt("atomic_float_to_string", &[(*fv).into()])?;
+                let cc = self.call_rt("action_float_to_string", &[(*fv).into()])?;
                 match cc.try_as_basic_value().basic() {
                     Some(bv) => {
                         let alloca = self

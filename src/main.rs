@@ -19,7 +19,7 @@ use std::path::{Path, PathBuf};
 use typecheck::{TypeChecker, TypeRegistry};
 
 #[derive(ClapParser)]
-#[command(name = "atomic", about = "Atomic Language Compiler", version = "0.2.0")]
+#[command(name = "action", about = "Action Language Compiler", version = "0.2.0")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,

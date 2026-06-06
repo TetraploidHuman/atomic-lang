@@ -12,7 +12,7 @@ impl<'ctx> CodeGen<'ctx> {
         entries: &[(Expr, Expr)],
     ) -> Result<TypedValue<'ctx>, String> {
         let cap = self.i64_ty().const_int((entries.len() + 4) as u64, false);
-        let cc = self.call_rt("atomic_map_create", &[cap.into()])?;
+        let cc = self.call_rt("action_map_create", &[cap.into()])?;
         let map_bv = cc.try_as_basic_value().basic().ok_or("map_create failed")?;
         let alloca = self
             .builder
@@ -27,7 +27,7 @@ impl<'ctx> CodeGen<'ctx> {
             let val_fat = self.to_fat_struct(&val_val)?;
             let map_loaded = self.load_list(alloca)?;
             let cc = self.call_rt(
-                "atomic_map_insert",
+                "action_map_insert",
                 &[map_loaded.into(), key_fat.into(), val_fat.into()],
             )?;
             let new_map = cc.try_as_basic_value().basic().ok_or("map_insert failed")?;
@@ -46,7 +46,7 @@ impl<'ctx> CodeGen<'ctx> {
         // Set uses the same layout as map but with 2-i64 entries instead of 4-i64
         // For simplicity, use map layout but store elements as keys with null values
         let cap = self.i64_ty().const_int((elements.len() + 4) as u64, false);
-        let cc = self.call_rt("atomic_map_create", &[cap.into()])?;
+        let cc = self.call_rt("action_map_create", &[cap.into()])?;
         let set_bv = cc.try_as_basic_value().basic().ok_or("map_create failed")?;
         let alloca = self
             .builder
@@ -72,7 +72,7 @@ impl<'ctx> CodeGen<'ctx> {
             let elem_fat = self.to_fat_struct(&elem_val)?;
             let set_loaded = self.load_list(alloca)?;
             let cc = self.call_rt(
-                "atomic_map_insert",
+                "action_map_insert",
                 &[set_loaded.into(), elem_fat.into(), null_val.into()],
             )?;
             let new_set = cc.try_as_basic_value().basic().ok_or("map_insert failed")?;
@@ -87,7 +87,7 @@ impl<'ctx> CodeGen<'ctx> {
     pub(super) fn builtin_set_of(&mut self, args: &[Expr]) -> Result<TypedValue<'ctx>, String> {
         // Set.of(...) is equivalent to a set literal with the given elements
         let cap = self.i64_ty().const_int((args.len() + 4) as u64, false);
-        let cc = self.call_rt("atomic_map_create", &[cap.into()])?;
+        let cc = self.call_rt("action_map_create", &[cap.into()])?;
         let set_bv = cc.try_as_basic_value().basic().ok_or("map_create failed")?;
         let alloca = self
             .builder
@@ -113,7 +113,7 @@ impl<'ctx> CodeGen<'ctx> {
             let elem_fat = self.to_fat_struct(&elem_val)?;
             let set_loaded = self.load_list(alloca)?;
             let cc = self.call_rt(
-                "atomic_map_insert",
+                "action_map_insert",
                 &[set_loaded.into(), elem_fat.into(), null_val.into()],
             )?;
             let new_set = cc.try_as_basic_value().basic().ok_or("map_insert failed")?;
@@ -152,7 +152,7 @@ impl<'ctx> CodeGen<'ctx> {
         let val_fat = self.to_fat_struct(&val_val)?;
         let map_loaded = self.load_list(map_ptr)?;
         let cc = self.call_rt(
-            "atomic_map_insert",
+            "action_map_insert",
             &[map_loaded.into(), key_fat.into(), val_fat.into()],
         )?;
         let new_map = cc.try_as_basic_value().basic().ok_or("map_insert failed")?;
@@ -188,8 +188,8 @@ impl<'ctx> CodeGen<'ctx> {
         let map_loaded = self.load_list(map_ptr)?;
         let remove_fn = self
             .module
-            .get_function("atomic_map_remove")
-            .ok_or("atomic_map_remove not found")?;
+            .get_function("action_map_remove")
+            .ok_or("action_map_remove not found")?;
         let rc = self
             .builder
             .build_call(remove_fn, &[map_loaded.into(), key_fat.into()], "remove")
@@ -219,8 +219,8 @@ impl<'ctx> CodeGen<'ctx> {
         let map_loaded = self.load_list(map_ptr)?;
         let contains_fn = self
             .module
-            .get_function("atomic_map_contains")
-            .ok_or("atomic_map_contains not found")?;
+            .get_function("action_map_contains")
+            .ok_or("action_map_contains not found")?;
         let cc = self
             .builder
             .build_call(
@@ -276,8 +276,8 @@ impl<'ctx> CodeGen<'ctx> {
         // Check if element already exists
         let contains_fn = self
             .module
-            .get_function("atomic_map_contains")
-            .ok_or("atomic_map_contains not found")?;
+            .get_function("action_map_contains")
+            .ok_or("action_map_contains not found")?;
         let cc = self
             .builder
             .build_call(
@@ -305,7 +305,7 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(insert_bb);
         let set_loaded2 = self.load_list(set_ptr)?;
         let cc2 = self.call_rt(
-            "atomic_map_insert",
+            "action_map_insert",
             &[set_loaded2.into(), elem_fat.into(), null_val.into()],
         )?;
         let new_set = cc2
@@ -346,8 +346,8 @@ impl<'ctx> CodeGen<'ctx> {
         let set_loaded = self.load_list(set_ptr)?;
         let remove_fn = self
             .module
-            .get_function("atomic_map_remove")
-            .ok_or("atomic_map_remove not found")?;
+            .get_function("action_map_remove")
+            .ok_or("action_map_remove not found")?;
         let rc = self
             .builder
             .build_call(remove_fn, &[set_loaded.into(), elem_fat.into()], "remove")
@@ -385,8 +385,8 @@ impl<'ctx> CodeGen<'ctx> {
         let set_loaded = self.load_list(set_ptr)?;
         let contains_fn = self
             .module
-            .get_function("atomic_map_contains")
-            .ok_or("atomic_map_contains not found")?;
+            .get_function("action_map_contains")
+            .ok_or("action_map_contains not found")?;
         let cc = self
             .builder
             .build_call(

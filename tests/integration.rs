@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 use std::process::Command;
 
-fn atomic_binary() -> PathBuf {
-    // CARGO_BIN_EXE_atomic is set by cargo test itself — trust it unconditionally.
-    if let Ok(path) = std::env::var("CARGO_BIN_EXE_atomic") {
+fn action_binary() -> PathBuf {
+    // CARGO_BIN_EXE_action is set by cargo test itself — trust it unconditionally.
+    if let Ok(path) = std::env::var("CARGO_BIN_EXE_action") {
         return PathBuf::from(&path);
     }
 
@@ -15,11 +15,11 @@ fn atomic_binary() -> PathBuf {
     };
 
     let candidates: &[&str] = if cfg!(target_os = "windows") {
-        &["x86_64-pc-windows-msvc/debug/atomic"]
+        &["x86_64-pc-windows-msvc/debug/action"]
     } else {
         &[
-            "x86_64-unknown-linux-gnu/debug/atomic",
-            "aarch64-unknown-linux-gnu/debug/atomic",
+            "x86_64-unknown-linux-gnu/debug/action",
+            "aarch64-unknown-linux-gnu/debug/action",
         ]
     };
 
@@ -31,19 +31,19 @@ fn atomic_binary() -> PathBuf {
     }
 
     // Fallback: default target dir (no --target)
-    let p = base.join(format!("debug/atomic{}", exe_suffix));
+    let p = base.join(format!("debug/action{}", exe_suffix));
     if p.exists() {
         return p;
     }
 
-    panic!("atomic binary not found — build with `cargo build` first");
+    panic!("action binary not found — build with `cargo build` first");
 }
 
 fn run_example(name: &str) -> String {
     let example = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("examples")
         .join(name);
-    let output = Command::new(atomic_binary())
+    let output = Command::new(action_binary())
         .args(["run", example.to_str().unwrap()])
         .output()
         .expect(&format!("Failed to run example: {}", name));

@@ -171,7 +171,7 @@ impl<'ctx> CodeGen<'ctx> {
                             .map_err(llvm_err)?;
                         // Create new list
                         let cap = self.i64_ty().const_int(4, false);
-                        let new_list_cc = self.call_rt("atomic_list_create", &[cap.into()])?;
+                        let new_list_cc = self.call_rt("action_list_create", &[cap.into()])?;
                         let new_list_bv = new_list_cc
                             .try_as_basic_value()
                             .basic()
@@ -236,7 +236,7 @@ impl<'ctx> CodeGen<'ctx> {
                             .map_err(llvm_err)?;
                         let rest_loaded = self.load_list(rest_alloca)?;
                         let pushed =
-                            self.call_rt("atomic_list_push", &[rest_loaded.into(), elem.into()])?;
+                            self.call_rt("action_list_push", &[rest_loaded.into(), elem.into()])?;
                         let new_rest = pushed
                             .try_as_basic_value()
                             .basic()
