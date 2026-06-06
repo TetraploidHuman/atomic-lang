@@ -466,10 +466,13 @@ fn resolve_imports(program: &Program, search_dirs: &[PathBuf]) -> Result<Vec<Stm
                             format!("{}_{}", prefix, name)
                         };
                         // Filter by: import items list (if specified) AND module exports (if specified)
-                        let item_filter = items.is_none()
-                            || items.as_ref().map_or(false, |its| its.contains(name));
-                        let export_filter = exported.as_ref().map_or(true, |e| e.contains(name));
-                        let should_import = item_filter || (items.is_none() && export_filter);
+                        let should_import = if let Some(ref its) = items {
+                            its.contains(name)
+                        } else if let Some(ref exported_set) = exported {
+                            exported_set.contains(name)
+                        } else {
+                            true
+                        };
                         if should_import {
                             extra_stmts.push(Stmt::Fun {
                                 name: imported_name,
@@ -488,10 +491,14 @@ fn resolve_imports(program: &Program, search_dirs: &[PathBuf]) -> Result<Vec<Stm
                         value,
                         ..
                     } => {
-                        let item_filter = items.is_none()
-                            || items.as_ref().map_or(false, |its| its.contains(name));
-                        let export_filter = exported.as_ref().map_or(true, |e| e.contains(name));
-                        if item_filter || (items.is_none() && export_filter) {
+                        let should_import = if let Some(ref its) = items {
+                            its.contains(name)
+                        } else if let Some(ref exported_set) = exported {
+                            exported_set.contains(name)
+                        } else {
+                            true
+                        };
+                        if should_import {
                             let imported_name = if items.is_some() {
                                 name.clone()
                             } else {
@@ -511,10 +518,14 @@ fn resolve_imports(program: &Program, search_dirs: &[PathBuf]) -> Result<Vec<Stm
                         definition,
                         ..
                     } => {
-                        let item_filter = items.is_none()
-                            || items.as_ref().map_or(false, |its| its.contains(name));
-                        let export_filter = exported.as_ref().map_or(true, |e| e.contains(name));
-                        if item_filter || (items.is_none() && export_filter) {
+                        let should_import = if let Some(ref its) = items {
+                            its.contains(name)
+                        } else if let Some(ref exported_set) = exported {
+                            exported_set.contains(name)
+                        } else {
+                            true
+                        };
+                        if should_import {
                             let imported_name = if items.is_some() {
                                 name.clone()
                             } else {
@@ -534,10 +545,14 @@ fn resolve_imports(program: &Program, search_dirs: &[PathBuf]) -> Result<Vec<Stm
                         variants,
                         ..
                     } => {
-                        let item_filter = items.is_none()
-                            || items.as_ref().map_or(false, |its| its.contains(name));
-                        let export_filter = exported.as_ref().map_or(true, |e| e.contains(name));
-                        if item_filter || (items.is_none() && export_filter) {
+                        let should_import = if let Some(ref its) = items {
+                            its.contains(name)
+                        } else if let Some(ref exported_set) = exported {
+                            exported_set.contains(name)
+                        } else {
+                            true
+                        };
+                        if should_import {
                             let imported_name = if items.is_some() {
                                 name.clone()
                             } else {
