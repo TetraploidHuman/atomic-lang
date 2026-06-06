@@ -711,7 +711,9 @@ impl Parser {
                     // Just a parenthesized type
                     Ok(params.into_iter().next().unwrap())
                 } else {
-                    Err(self.error("Expected '->' for function type after parenthesized parameter list"))
+                    Err(self.error(
+                        "Expected '->' for function type after parenthesized parameter list",
+                    ))
                 }
             }
             TokenKind::LBrace => {
@@ -1635,7 +1637,7 @@ impl Parser {
                         None
                     };
                     self.expect(TokenKind::Arrow)?;
-                    let body = self.parse_expr()?;
+                    let body = self.parse_pratt(Precedence::Shift)?;
                     arms.push(WhenArm {
                         pattern,
                         guard,
